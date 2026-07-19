@@ -15,6 +15,7 @@ from .models import (
     StoryContent,
     Theme,
     Touchpoint,
+    VisitorEvent,
     VisitorSession,
     Zone,
 )
@@ -53,6 +54,7 @@ def data_overview(request):
         ("itineraries", "专属路线", Itinerary, "/admin/main/itinerary/"),
         ("footprints", "足迹", Footprint, "/admin/main/footprint/"),
         ("favorites", "收藏", Favorite, "/admin/main/favorite/"),
+        ("visitor_events", "行为事件", VisitorEvent, "/admin/main/visitorevent/"),
     )
     counts = {key: model.objects.count() for key, _, model, _ in model_stats}
     context = {
@@ -71,6 +73,9 @@ def data_overview(request):
         ).order_by("-triggered_at")[:5],
         "recent_favorites": Favorite.objects.select_related(
             "session", "attraction"
+        ).order_by("-created_at")[:5],
+        "recent_events": VisitorEvent.objects.select_related(
+            "session", "attraction", "itinerary"
         ).order_by("-created_at")[:5],
     }
     return render(request, "admin/data_overview.html", context)
@@ -254,4 +259,14 @@ class FavoriteAdmin(ReadOnlyEvidenceAdminMixin, admin.ModelAdmin):
     search_fields = ("=session__id", "attraction__name")
     autocomplete_fields = ("session", "attraction")
     list_select_related = ("session", "attraction")
+    readonly_fields = ("created_at",)
+
+
+@admin.register(VisitorEvent)
+class VisitorEventAdmin(ReadOnlyEvidenceAdminMixin, admin.ModelAdmin):
+    list_display = ("id", "session", "event_type", "attraction", "itinerary", "created_at")
+    list_filter = ("event_type", "created_at")
+    search_fields = ("=session__id", "event_type", "attraction__name")
+    autocomplete_fields = ("session", "attraction", "itinerary")
+    list_select_related = ("session", "attraction", "itinerary")
     readonly_fields = ("created_at",)

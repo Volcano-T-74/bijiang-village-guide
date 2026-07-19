@@ -413,6 +413,44 @@ class Footprint(models.Model):
         return f"{self.session} - {self.attraction}"
 
 
+class VisitorEvent(models.Model):
+    id = models.BigAutoField("ID", primary_key=True)
+    session = models.ForeignKey(
+        VisitorSession,
+        verbose_name="游客会话",
+        on_delete=models.CASCADE,
+        related_name="events",
+    )
+    event_type = models.CharField("事件类型", max_length=50)
+    attraction = models.ForeignKey(
+        Attraction,
+        verbose_name="关联景点",
+        on_delete=models.SET_NULL,
+        related_name="events",
+        null=True,
+        blank=True,
+    )
+    itinerary = models.ForeignKey(
+        Itinerary,
+        verbose_name="关联路线",
+        on_delete=models.SET_NULL,
+        related_name="events",
+        null=True,
+        blank=True,
+    )
+    metadata = models.JSONField("补充数据", default=dict, blank=True)
+    created_at = models.DateTimeField("记录时间", auto_now_add=True)
+
+    class Meta:
+        db_table = "visitor_events"
+        ordering = ("-created_at",)
+        verbose_name = "游客行为事件"
+        verbose_name_plural = "游客行为事件"
+
+    def __str__(self):
+        return f"{self.session} - {self.event_type}"
+
+
 class Favorite(models.Model):
     id = models.AutoField("ID", primary_key=True)
     session = models.ForeignKey(

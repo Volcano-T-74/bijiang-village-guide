@@ -8,12 +8,21 @@ from rest_framework.views import APIView
 from main.models import (
     Attraction,
     AttractionPath,
+    Favorite,
+    Footprint,
     Itinerary,
     Theme,
+    VisitorEvent,
     VisitorSession,
     Zone,
 )
-from main.serializers import ItineraryGenerateSerializer, SessionCreateSerializer
+from main.serializers import (
+    EventCreateSerializer,
+    FavoriteCreateSerializer,
+    FootprintCreateSerializer,
+    ItineraryGenerateSerializer,
+    SessionCreateSerializer,
+)
 from main.services.route_planner import NoRouteError, build_route_payload, generate_route
 
 
@@ -244,3 +253,77 @@ class ItineraryDetailView(APIView):
             return Response(
                 {"detail": str(exc)}, status=status.HTTP_422_UNPROCESSABLE_ENTITY
             )
+
+
+class EventCreateView(APIView):
+    def post(self, request):
+        session = _session_from_request(request)
+        serializer = EventCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        itinerary = None
+        itinerary_id = serializer.validated_data.get("itinerary_id")
+        if itinerary_id is not None:
+            itinerary = get_object_or_404(Itinerary, pk=itinerary_id, session=session)
+        event = VisitorEvent.objects.create(
+            session=session,
+            event_type=serializer.validated_data["event_type"],
+            attraction=getattr(serializer, "attraction", None),
+            itinerary=itinerary,
+            metadata=serializer.validated_data["metadata"],
+        )
+        return Response(
+            {
+                "id": event.id,
+                "event_type": event.event_type,
+                "created_at": event.created_at,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class FavoriteCreateView(APIView):
+    def post(self, request):
+        session = _session_from_request(request)
+        serializer = FavoriteCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        favorite, _ = Favorite.objects.get_or_create(
+            session=session,
+            attraction=serializer.attraction,
+        )
+        return Response(
+            {
+                "id": favorite.id,
+                "attraction_slug": favorite.attraction.slug,
+                "created_at": favorite.created_at,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class FootprintCreateView(APIView):
+    def post(self, request):
+        session = _session_from_request(request)
+        serializer = FootprintCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        itinerary = get_object_or_404(
+            Itinerary,
+            pk=serializer.validated_data["itinerary_id"],
+            session=session,
+        )
+        footprint = Footprint.objects.create(
+            session=session,
+            itinerary=itinerary,
+            attraction=serializer.attraction,
+            touchpoint=serializer.touchpoint,
+            audio_played=serializer.validated_data["audio_played"],
+        )
+        return Response(
+            {
+                "id": footprint.id,
+                "attraction_slug": footprint.attraction.slug,
+                "touchpoint_code": footprint.touchpoint.trigger_code,
+                "triggered_at": footprint.triggered_at,
+                "audio_played": footprint.audio_played,
+            },
+            status=status.HTTP_201_CREATED,
+        )

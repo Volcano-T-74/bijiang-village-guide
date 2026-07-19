@@ -1,4 +1,12 @@
-import { ensureVisitorSession, generateItinerary, getAttraction, getBootstrap } from '../api.js'
+import {
+  ensureVisitorSession,
+  generateItinerary,
+  getAttraction,
+  getBootstrap,
+  recordEvent,
+  recordFavorite,
+  recordFootprint,
+} from '../api.js'
 
 export function createBijiangSite(app, toast) {
 const villageMapUrl = new URL('./assets/village-map.png', import.meta.url).href;
@@ -42,6 +50,22 @@ const collectStoryBgImg = new URL('./assets/收藏故事背景图.png', import.m
 const deviceIconImg = new URL('./assets/设备管理.png', import.meta.url).href;
 const historyIconImg = new URL('./assets/历史路线.png', import.meta.url).href;
 const historyBgImg = new URL('./assets/历史路线背景图.png', import.meta.url).href;
+
+const interestBgImg = new URL('./assets/兴趣路线背景图.png', import.meta.url).href;
+const routePreviewImg = new URL('./assets/路线预览.png', import.meta.url).href;
+
+const interestIconMap = {
+  "古建筑": new URL('./assets/古建筑.png', import.meta.url).href,
+  "宗族故事": new URL('./assets/宗族故事.png', import.meta.url).href,
+  "人物旧居": new URL('./assets/人物旧居.png', import.meta.url).href,
+  "诗词记忆": new URL('./assets/诗词记忆.png', import.meta.url).href,
+  "巷道漫游": new URL('./assets/巷道漫游.png', import.meta.url).href,
+  "民俗生活": new URL('./assets/民俗生活.png', import.meta.url).href,
+  "水岸风景": new URL('./assets/水岸风景.png', import.meta.url).href,
+  "亲子体验": new URL('./assets/亲子体验.png', import.meta.url).href,
+};
+
+const totalMapImg = new URL('./assets/total-map.png', import.meta.url).href;
 
 const icon = (name, className = "") =>
   `<svg class="icon ${className}" aria-hidden="true"><use href="#i-${name}"></use></svg>`;
@@ -293,21 +317,56 @@ function profileItem(title, copy, meta, ico) {
 
 function renderInterests() {
   const modeOptions = [
-    ["relaxed", "轻松逛", "慢步游览，风景路径优先"],
-    ["deep", "深度走读", "深度节点优先，停留更充分"],
+    ["relaxed", "轻松逛", "慢步游览，轻松自在"],
+    ["deep", "深度走读", "深度讲解，全面了解"],
   ];
   return shell(`
     <header class="subpage-header reveal"><h1>兴趣路线</h1><p>根据你的兴趣规划游览路线</p></header>
-    <section class="config-panel reveal">
+    
+    <!-- 配置面板（添加背景图） -->
+    <section class="config-panel reveal" style="background-image: url('${interestBgImg}'); background-size: cover; background-position: center; background-blend-mode: overlay;">
       ${sectionTitle("选择你的兴趣")}
-      <div class="interest-grid">${interests.map(([name, ico]) => `<button class="interest-card ${state.interests.has(name) ? "selected" : ""}" data-interest="${name}" aria-pressed="${state.interests.has(name)}"><span>${icon(ico)}</span><strong>${name}</strong><i>${icon("check")}</i></button>`).join("")}</div>
+      <div class="interest-grid">
+        ${interests.map(([name]) => `
+          <button class="interest-card ${state.interests.has(name) ? "selected" : ""}" data-interest="${name}" aria-pressed="${state.interests.has(name)}">
+            <span style="display:grid; place-items:center; width:64px; height:64px; border-radius:50%; background:#efe7d8; overflow:hidden;">
+              <img src="${interestIconMap[name]}" alt="${name}" style="width:100%; height:100%; object-fit:cover;" />
+            </span>
+            <strong>${name}</strong>
+            <i>${icon("check")}</i>
+          </button>
+        `).join("")}
+      </div>
+      
       ${sectionTitle("路线设置")}
-      <div class="setting-block"><label>${icon("clock")} 游览时长</label><div class="segmented">${[30, 60, 90].map(n => `<button class="${state.duration === n ? "selected" : ""}" data-duration="${n}">${n}分钟</button>`).join("")}</div></div>
-      <div class="setting-block"><label>${icon("walk")} 探索方式</label><div class="mode-grid">${modeOptions.map(([value, label, sub]) => `<button class="${state.mode === value ? "selected" : ""}" data-mode="${value}"><strong>${label}</strong><small>${sub}</small></button>`).join("")}</div></div>
+      <div class="setting-block">
+        <label>${icon("clock")} 游览时长</label>
+        <div class="segmented">
+          ${[30, 60, 90].map(n => `<button class="${state.duration === n ? "selected" : ""}" data-duration="${n}">${n}分钟</button>`).join("")}
+        </div>
+      </div>
+      <div class="setting-block">
+        <label>${icon("walk")} 探索方式</label>
+        <div class="mode-grid">
+          ${modeOptions.map(([value, label, sub]) => `
+            <button class="${state.mode === value ? "selected" : ""}" data-mode="${value}">
+              <strong>${label}</strong>
+              <small>${sub}</small>
+            </button>
+          `).join("")}
+        </div>
+      </div>
+      
       ${sectionTitle("路线预览")}
-      <p class="preview-copy">从村史馆出发，在 <b>${places.length}</b> 个故事节点中计算最佳路线</p>
-      <div class="route-preview">${Array.from(state.interests).map(name => `<span>${name}</span>`).join(icon("arrow")) || "均衡探索"}</div>
-      <button class="primary-button wide" data-action="generate-route" ${state.generating ? "disabled" : ""}>${state.generating ? "正在规划…" : "生成我的路线"}</button>
+      <p class="preview-copy">将从碧江村 <b>${places.length}</b> 处景点中为你规划专属路线</p>
+      <div class="route-preview" style="display:flex; align-items:center; gap:8px; padding:12px 16px; border:1px solid var(--line); border-radius:17px; background:#f9f4eb;">
+        ${Array.from(state.interests).map(name => `<span style="font-weight:700; font-size:16px;">${name}</span>`).join(icon("arrow")) || "均衡探索"}
+        <img src="${routePreviewImg}" alt="路线预览" style="width:32px; height:32px; object-fit:contain; margin-left:auto;" />
+      </div>
+      
+      <button class="primary-button wide" data-action="generate-route" ${state.generating ? "disabled" : ""}>
+        ${state.generating ? "正在规划…" : "生成我的路线"}
+      </button>
     </section>
   `, { back: true, nav: false, className: "subpage" });
 }
@@ -325,10 +384,31 @@ function renderRoute() {
   return shell(`
     <header class="subpage-header reveal"><h1>我的路线</h1><p>根据您的兴趣生成的专属路线</p></header>
     <section class="route-map reveal">
-      <img src="${villageMapUrl}" alt="碧江村专属游览路线地图" />
-      <svg class="route-line" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="${line}"/></svg>
-      ${route.stops.map((stop, index) => `<button class="map-marker" data-attraction-slug="${stop.slug}" style="--x:${stop.map_position.x}%;--y:${stop.map_position.y}%" aria-label="查看${stop.name}故事">${index + 1}</button>`).join("")}
-    </section>
+  <img
+    src="${villageMapUrl}"
+    alt="碧江村总地图"
+  />
+
+  <svg
+    class="route-line"
+    viewBox="0 0 100 100"
+    preserveAspectRatio="none"
+    aria-hidden="true"
+  >
+    <path d="${line}" />
+  </svg>
+
+  ${route.stops.map((stop, index) => `
+    <button
+      class="map-marker"
+      data-attraction-slug="${stop.slug}"
+      style="--x:${stop.map_position.x}%; --y:${stop.map_position.y}%"
+      aria-label="查看${stop.name}故事"
+    >
+      ${index + 1}
+    </button>
+  `).join("")}
+</section>
     <section class="route-stats reveal"><div>${icon("clock")}<span><strong>${route.total_estimated_minutes}分钟</strong><small>${modeLabel}</small></span></div><div>${icon("book")}<span><strong>${route.stops.length}个故事点</strong><small>评分 ${route.score}</small></span></div><div>${icon("walk")}<span><strong>${route.legs.reduce((sum, leg) => sum + leg.distance_meters, 0)}米</strong><small>预计步行</small></span></div></section>
     <section class="route-stop-list reveal">
       ${route.stops.map((stop, index) => `<button class="route-stop" data-attraction-slug="${stop.slug}"><span>${index + 1}</span><div><strong>${stop.name}</strong><small>${stop.zone.name} · ${stop.visit_minutes}分钟</small><p>${stop.recommendation}</p></div>${icon("arrow", "card-arrow")}</button>${route.legs[index] ? `<p class="route-bridge">${route.legs[index].narrative_bridge}</p>` : ""}`).join("")}
@@ -355,6 +435,7 @@ function renderAttractionDetail() {
       <img src="${attraction.cover_image_url}" alt="${escapeHtml(attraction.name)}" />
       <div><small>${escapeHtml(attraction.zone.name)}</small><h1>${escapeHtml(attraction.name)}</h1><p>${escapeHtml(attraction.subtitle)}</p></div>
     </section>
+    <button class="primary-button wide reveal" data-action="favorite-current">收藏这个故事</button>
     ${story ? `<article class="dynamic-story-body reveal"><blockquote>${escapeHtml(story.fun_fact)}</blockquote>${paragraphs.map(paragraph => `<p>${escapeHtml(paragraph)}</p>`).join("")}</article>` : `<p class="route-note">故事内容正在整理</p>`}
   `, { back: true, nav: false, className: "story-detail-page dynamic-story-page" });
 }
@@ -498,6 +579,17 @@ async function initializeData() {
   try {
     await ensureVisitorSession();
     const data = await getBootstrap();
+    const fixedPositions = {
+   "village-history-museum": { x: 22, y: 18 },    // 村史馆 - 左上
+   "bixi-scholar-hall": { x: 48, y: 12 },          // 碧溪书公祠 - 上中
+   "huang-ancestral-hall": { x: 15, y: 35 },       // 黄氏宗祠 - 左中上
+   "dong-ancestral-hall": { x: 68, y: 28 },        // 东氏宗祠 - 右中上
+   "ancient-bridge": { x: 55, y: 45 },             // 古桥 - 中间
+   "poetry-lane": { x: 30, y: 58 },                // 诗词巷 - 左中下
+   "xiuxi-peng-ancestral-hall": { x: 45, y: 72 },  // 绣西彭公祠 - 中下
+   "old-wharf": { x: 72, y: 60 },                  // 老码头 - 右下
+   "waterside-ancient-tree": { x: 85, y: 78 },     // 水岸古树 - 右下角
+};
     if (destroyed) return;
     interests = data.themes.map(theme => [theme.name, theme.icon]);
     places = data.attractions;
@@ -506,24 +598,95 @@ async function initializeData() {
     if (!state.interests.size) data.themes.slice(0, 2).forEach(theme => state.interests.add(theme.name));
   } catch (error) {
     console.warn('API请求失败，使用模拟数据:', error.message);
-    // ========== 模拟数据 ==========
-    interests = [
-      ["岭南建筑", "building"],
-      ["诗书文脉", "book"],
-      ["水乡风情", "route"],
-      ["宗族记忆", "user"]
-    ];
+    // ========== 模拟数据（兴趣路线） ==========
+  interests = [
+   ["古建筑", "building"],
+   ["宗族故事", "book"],
+   ["人物旧居", "home"],
+   ["诗词记忆", "book"],
+   ["巷道漫游", "route"],
+   ["民俗生活", "leaf"],
+   ["水岸风景", "map"],
+   ["亲子体验", "user"]
+  ];
+
+ state.interests = new Set(["古建筑", "宗族故事"]);
+        
     places = [
-      { slug: "huang-ancestral-hall", name: "黄氏宗祠", zone: { name: "宗祠区" }, cover_image_url: placeImgUrls["huang-ancestral-hall"] },
-      { slug: "village-history-museum", name: "村史馆", zone: { name: "村史区" }, cover_image_url: placeImgUrls["village-history-museum"] },
-      { slug: "bixi-scholar-hall", name: "碧溪书公祠", zone: { name: "宗祠区" }, cover_image_url: placeImgUrls["bixi-scholar-hall"] },
-      { slug: "dong-ancestral-hall", name: "东氏宗祠", zone: { name: "宗祠区" }, cover_image_url: placeImgUrls["dong-ancestral-hall"] },
-      { slug: "ancient-bridge", name: "古桥", zone: { name: "水岸区" }, cover_image_url: placeImgUrls["ancient-bridge"] },
-      { slug: "poetry-lane", name: "诗词巷", zone: { name: "巷道区" }, cover_image_url: placeImgUrls["poetry-lane"] },
-      { slug: "xiuxi-peng-ancestral-hall", name: "绣西彭公祠", zone: { name: "宗祠区" }, cover_image_url: placeImgUrls["xiuxi-peng-ancestral-hall"] },
-      { slug: "old-wharf", name: "老码头", zone: { name: "水岸区" }, cover_image_url: placeImgUrls["old-wharf"] },
-      { slug: "waterside-ancient-tree", name: "水岸古树", zone: { name: "水岸区" }, cover_image_url: placeImgUrls["waterside-ancient-tree"] }
-    ];
+  { 
+    slug: "village-history-museum", 
+    name: "村史馆", 
+    zone: { name: "村史区" },
+    map_position: { x: 20, y: 15 },   // 左上
+    tags: ["民俗生活", "人物旧居"],
+    cover_image_url: placeImgUrls["village-history-museum"]
+  },
+  { 
+    slug: "bixi-scholar-hall", 
+    name: "碧溪书公祠", 
+    zone: { name: "宗祠区" },
+    map_position: { x: 48, y: 10 },   // 上中
+    tags: ["古建筑", "诗词记忆"],
+    cover_image_url: placeImgUrls["bixi-scholar-hall"]
+  },
+  { 
+    slug: "huang-ancestral-hall", 
+    name: "黄氏宗祠", 
+    zone: { name: "宗祠区" },
+    map_position: { x: 15, y: 32 },   // 左中上
+    tags: ["古建筑", "宗族故事"],
+    cover_image_url: placeImgUrls["huang-ancestral-hall"]
+  },
+  { 
+    slug: "dong-ancestral-hall", 
+    name: "东氏宗祠", 
+    zone: { name: "宗祠区" },
+    map_position: { x: 72, y: 25 },   // 右中上
+    tags: ["古建筑", "宗族故事"],
+    cover_image_url: placeImgUrls["dong-ancestral-hall"]
+  },
+  { 
+    slug: "ancient-bridge", 
+    name: "古桥", 
+    zone: { name: "水岸区" },
+    map_position: { x: 55, y: 45 },   // 中间
+    tags: ["水岸风景", "巷道漫游"],
+    cover_image_url: placeImgUrls["ancient-bridge"]
+  },
+  { 
+    slug: "poetry-lane", 
+    name: "诗词巷", 
+    zone: { name: "巷道区" },
+    map_position: { x: 28, y: 58 },   // 左中下
+    tags: ["诗词记忆", "巷道漫游"],
+    cover_image_url: placeImgUrls["poetry-lane"]
+  },
+  { 
+    slug: "xiuxi-peng-ancestral-hall", 
+    name: "绣西彭公祠", 
+    zone: { name: "宗祠区" },
+    map_position: { x: 45, y: 72 },   // 中下
+    tags: ["古建筑", "人物旧居"],
+    cover_image_url: placeImgUrls["xiuxi-peng-ancestral-hall"]
+  },
+  { 
+    slug: "old-wharf", 
+    name: "老码头", 
+    zone: { name: "水岸区" },
+    map_position: { x: 75, y: 62 },   // 右下
+    tags: ["水岸风景", "民俗生活"],
+    cover_image_url: placeImgUrls["old-wharf"]
+  },
+  { 
+    slug: "waterside-ancient-tree", 
+    name: "水岸古树", 
+    zone: { name: "水岸区" },
+    map_position: { x: 85, y: 80 },   // 右下角
+    tags: ["水岸风景", "亲子体验"],
+    cover_image_url: placeImgUrls["waterside-ancient-tree"]
+  }
+];  
+
     // 确保兴趣选择有效
     const validNames = new Set(interests.map(([name]) => name));
     state.interests = new Set(Array.from(state.interests).filter(name => validNames.has(name)));
@@ -537,6 +700,10 @@ async function initializeData() {
   }
 }
 
+function reportBehavior(promise) {
+  promise.catch(error => console.warn('behavior record failed', error.message));
+}
+
 async function createRoute() {
   if (state.generating) return;
   state.generating = true;
@@ -548,9 +715,69 @@ async function createRoute() {
       mode: state.mode,
       start_attraction_slug: "village-history-museum",
     });
+    reportBehavior(recordEvent('generate_route', {
+      itinerary_id: state.route.id,
+      metadata: {
+        preference_tags: Array.from(state.interests),
+        duration_minutes: state.duration,
+        mode: state.mode,
+      },
+    }));
     navigate("route");
   } catch (error) {
-    showToast(`路线生成失败：${error.message}`);
+    console.warn('API生成路线失败，使用模拟路线:', error.message);
+    const selectedInterests = Array.from(state.interests);
+    
+    // 1. 筛选景点
+    let filtered = places.filter(p => 
+      p.tags && p.tags.some(tag => selectedInterests.includes(tag))
+    );
+    if (filtered.length === 0) {
+      filtered = places.filter(p =>
+        selectedInterests.some(tag => p.name.includes(tag) || p.slug.includes(tag))
+      );
+    }
+    if (filtered.length === 0) {
+      filtered = places.slice(0, 5);
+    }
+    
+    // ===== 2. 按地图位置排序（从上到下，从左到右），形成自然路径 =====
+    filtered.sort((a, b) => {
+      // 先按 y 坐标（从上到下），再按 x 坐标（从左到右）
+      const aY = a.map_position?.y ?? 0;
+      const bY = b.map_position?.y ?? 0;
+      if (Math.abs(aY - bY) < 10) {
+        return (a.map_position?.x ?? 0) - (b.map_position?.x ?? 0);
+      }
+      return aY - bY;
+    });
+    
+    // 3. 生成 stops（使用景点自带的坐标）
+    const stops = filtered.map((p, idx) => ({
+      slug: p.slug,
+      name: p.name,
+      zone: { name: p.zone?.name || '碧江' },
+      visit_minutes: 20 + Math.floor(Math.random() * 10),
+      map_position: p.map_position || { x: 15 + idx * 12, y: 25 + idx * 6 }, // 如果没有坐标则使用备用
+      recommendation: `探索「${p.name}」，感受 ${p.tags ? p.tags.join('、') : '碧江'} 的独特魅力。`
+    }));
+    
+    // 4. 生成 legs
+    const legs = stops.slice(1).map((_, idx) => ({
+      distance_meters: 150 + Math.floor(Math.random() * 100),
+      narrative_bridge: `沿碧水前行，不远处便是下一处风景。`
+    }));
+    
+    const route = {
+      stops: stops,
+      legs: legs,
+      total_estimated_minutes: stops.reduce((sum, s) => sum + s.visit_minutes, 0),
+      score: 4.5 + Math.random() * 0.5,
+      mode: state.mode,
+    };
+    
+    state.route = route;
+    navigate("route");
   } finally {
     state.generating = false;
     if (!destroyed && state.view === "interests") transition(render);
@@ -565,6 +792,10 @@ async function openAttraction(slug) {
   else navigate("attraction");
   try {
     state.attractionDetail = await getAttraction(slug);
+    reportBehavior(recordEvent('view_attraction', {
+      attraction_slug: slug,
+      itinerary_id: state.route?.id,
+    }));
   } catch (error) {
     showToast(`故事加载失败：${error.message}`);
   } finally {
@@ -586,9 +817,25 @@ const handleClick = (event) => {
   if (button.dataset.duration) { state.duration = Number(button.dataset.duration); transition(render); return; }
   if (button.dataset.mode) { state.mode = button.dataset.mode; transition(render); return; }
   if (button.dataset.action === "generate-route") { void createRoute(); return; }
+  if (button.dataset.action === "favorite-current") {
+    const slug = state.attractionDetail?.slug || state.selectedAttraction;
+    if (slug) {
+      reportBehavior(recordFavorite(slug));
+      reportBehavior(recordEvent('favorite_story', { attraction_slug: slug }));
+      showToast("已收藏故事");
+    }
+    return;
+  }
   if (button.dataset.action === "back") { history.length > 1 ? history.back() : navigate("home", true); return; }
   if (button.dataset.action === "toggle-audio") {
     state.audioPlaying = !state.audioPlaying;
+    if (state.audioPlaying) {
+      reportBehavior(recordEvent('audio_play', {
+        attraction_slug: state.selectedAttraction || 'huang-ancestral-hall',
+        itinerary_id: state.route?.id,
+        metadata: { progress: state.audioProgress },
+      }));
+    }
     clearInterval(audioTimer);
     if (state.audioPlaying) audioTimer = setInterval(() => {
       state.audioProgress = Math.min(100, state.audioProgress + 0.34);
@@ -598,7 +845,20 @@ const handleClick = (event) => {
     }, 1000);
     transition(render); return;
   }
-  if (button.dataset.action === "stamp") { showToast(button.classList.contains("is-lit") ? "这个印章已经点亮" : "到达景点后即可解锁"); return; }
+  if (button.dataset.action === "stamp") {
+    const place = places[Number(button.dataset.index)];
+    if (place?.slug && state.route?.id) {
+      reportBehavior(recordFootprint({
+        itinerary_id: state.route.id,
+        attraction_slug: place.slug,
+        audio_played: state.audioProgress >= 95,
+      }));
+    } else if (place?.slug) {
+      reportBehavior(recordEvent('stamp_click', { attraction_slug: place.slug }));
+    }
+    showToast(button.classList.contains("is-lit") ? "这个印章已经点亮" : "到达景点后即可解锁");
+    return;
+  }
   if (button.dataset.action === "toast") showToast(button.dataset.message || "功能即将开放");
 };
 

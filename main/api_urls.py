@@ -3,6 +3,9 @@ from django.urls import path
 from main.api_views import (
     AttractionDetailView,
     BootstrapView,
+    EventCreateView,
+    FavoriteCreateView,
+    FootprintCreateView,
     ItineraryDetailView,
     ItineraryGenerateView,
     SessionCreateView,
@@ -11,6 +14,9 @@ from main.api_views import (
 
 urlpatterns = [
     path("bootstrap/", BootstrapView.as_view(), name="api-bootstrap"),
+    path("events/", EventCreateView.as_view(), name="api-event-create"),
+    path("favorites/", FavoriteCreateView.as_view(), name="api-favorite-create"),
+    path("footprints/", FootprintCreateView.as_view(), name="api-footprint-create"),
     path(
         "attractions/<slug:slug>/",
         AttractionDetailView.as_view(),

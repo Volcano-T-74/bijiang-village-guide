@@ -49,3 +49,33 @@ export function generateItinerary(values) {
 export function getAttraction(slug) {
   return request(`/attractions/${encodeURIComponent(slug)}/`)
 }
+
+export function recordEvent(eventType, values = {}) {
+  return request(
+    '/events/',
+    {
+      method: 'POST',
+      body: JSON.stringify({ event_type: eventType, ...values }),
+    },
+    true,
+  )
+}
+
+export function recordFavorite(attractionSlug) {
+  return request(
+    '/favorites/',
+    {
+      method: 'POST',
+      body: JSON.stringify({ attraction_slug: attractionSlug }),
+    },
+    true,
+  )
+}
+
+export function recordFootprint(values) {
+  return request(
+    '/footprints/',
+    { method: 'POST', body: JSON.stringify(values) },
+    true,
+  )
+}
