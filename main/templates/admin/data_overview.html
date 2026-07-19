@@ -1,0 +1,71 @@
+{% extends "admin/base_site.html" %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs"><a href="{% url 'admin:index' %}">首页</a> &rsaquo; 数据概览</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .overview-heading { margin: 0 0 18px; }
+  .overview-heading h1 { margin-bottom: 6px; font-size: 22px; }
+  .overview-heading p { margin: 0; color: #667085; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .stat-item { display: block; padding: 15px; border: 1px solid #e4e7ec; border-radius: 6px; background: #fff; color: #344054; text-decoration: none; }
+  .stat-item:hover { border-color: #409eff; color: #409eff; }
+  .stat-item strong { display: block; margin-top: 7px; color: #101828; font-size: 25px; line-height: 1; }
+  .overview-section { margin: 0 0 22px; }
+  .overview-section h2 { margin: 0; padding: 12px 14px; border-bottom: 1px solid #e4e7ec; background: #f8fafc; font-size: 16px; }
+  .overview-table { width: 100%; border-collapse: collapse; background: #fff; }
+  .overview-table th, .overview-table td { padding: 11px 14px; border-bottom: 1px solid #eaecf0; text-align: left; }
+  .overview-table th { color: #475467; font-weight: 600; }
+  .empty-row { color: #98a2b3; text-align: center !important; }
+  @media (max-width: 767px) { .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .overview-table { display: block; overflow-x: auto; } }
+</style>
+
+<div class="overview-heading">
+  <h1>碧江文旅数据概览</h1>
+  <p>以下数据实时读取当前数据库。</p>
+</div>
+
+<div class="stat-grid">
+  {% for item in stat_cards %}
+    <a class="stat-item" href="{{ item.url }}"><span>{{ item.label }}</span><strong>{{ item.count }}</strong></a>
+  {% endfor %}
+</div>
+
+<section class="overview-section module">
+  <h2>最近游客会话</h2>
+  <table class="overview-table">
+    <thead><tr><th>会话 ID</th><th>兴趣标签</th><th>上次所在区域</th><th>最后活跃时间</th></tr></thead>
+    <tbody>
+      {% for session in recent_sessions %}
+        <tr><td>{{ session.id }}</td><td>{{ session.preference_tags|default:"-" }}</td><td>{{ session.last_known_zone|default:"-" }}</td><td>{{ session.last_active_at }}</td></tr>
+      {% empty %}<tr><td class="empty-row" colspan="4">暂无游客会话</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="overview-section module">
+  <h2>最近足迹触发</h2>
+  <table class="overview-table">
+    <thead><tr><th>会话</th><th>景点</th><th>触点</th><th>音频完整播放</th><th>触发时间</th></tr></thead>
+    <tbody>
+      {% for footprint in recent_footprints %}
+        <tr><td>{{ footprint.session_id }}</td><td>{{ footprint.attraction }}</td><td>{{ footprint.touchpoint }}</td><td>{{ footprint.audio_played|yesno:"是,否" }}</td><td>{{ footprint.triggered_at }}</td></tr>
+      {% empty %}<tr><td class="empty-row" colspan="5">暂无足迹记录</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="overview-section module">
+  <h2>最近故事收藏</h2>
+  <table class="overview-table">
+    <thead><tr><th>会话</th><th>景点</th><th>收藏时间</th></tr></thead>
+    <tbody>
+      {% for favorite in recent_favorites %}
+        <tr><td>{{ favorite.session_id }}</td><td>{{ favorite.attraction }}</td><td>{{ favorite.created_at }}</td></tr>
+      {% empty %}<tr><td class="empty-row" colspan="3">暂无收藏记录</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}
