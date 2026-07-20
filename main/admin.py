@@ -12,6 +12,7 @@ from .models import (
     Footprint,
     HiddenDetail,
     Itinerary,
+    LocalVoice,
     StoryContent,
     Theme,
     Touchpoint,
@@ -45,6 +46,7 @@ def data_overview(request):
         ("attractions", "景点", Attraction, "/admin/main/attraction/"),
         ("story_contents", "故事", StoryContent, "/admin/main/storycontent/"),
         ("audio_assets", "音频", AudioAsset, "/admin/main/audioasset/"),
+        ("local_voices", "当地声音", LocalVoice, "/admin/main/localvoice/"),
         ("themes", "主题", Theme, "/admin/main/theme/"),
         ("attraction_themes", "主题标签", AttractionTheme, "/admin/main/attractiontheme/"),
         ("hidden_details", "隐藏彩蛋", HiddenDetail, "/admin/main/hiddendetail/"),
@@ -144,6 +146,26 @@ class AudioAssetAdmin(admin.ModelAdmin):
     search_fields = ("file_name", "content__attraction__name")
     autocomplete_fields = ("content",)
     list_select_related = ("content", "content__attraction")
+
+    @admin.display(description="音频文件")
+    def file_link(self, obj):
+        return _external_link(obj.file_url, "打开音频")
+
+
+@admin.register(LocalVoice)
+class LocalVoiceAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "title",
+        "language_label",
+        "duration_seconds",
+        "display_order",
+        "is_active",
+        "file_link",
+    )
+    list_editable = ("display_order", "is_active")
+    list_filter = ("language", "language_label", "is_active")
+    search_fields = ("title", "original_file_name")
 
     @admin.display(description="音频文件")
     def file_link(self, obj):

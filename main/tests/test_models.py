@@ -10,12 +10,50 @@ from main.models import (
     Footprint,
     HiddenDetail,
     Itinerary,
+    LocalVoice,
     StoryContent,
     Theme,
     Touchpoint,
     VisitorSession,
     Zone,
 )
+
+
+class LocalVoiceTests(SimpleTestCase):
+    def test_model_contract(self):
+        expected_fields = {
+            "title": (models.CharField, 100),
+            "original_file_name": (models.CharField, 100),
+            "file_url": (models.TextField, None),
+            "duration_seconds": (models.PositiveIntegerField, None),
+            "language": (models.CharField, 20),
+            "language_label": (models.CharField, 20),
+            "display_order": (models.PositiveSmallIntegerField, None),
+            "is_active": (models.BooleanField, None),
+        }
+
+        for field_name, (field_type, max_length) in expected_fields.items():
+            with self.subTest(field=field_name):
+                field = LocalVoice._meta.get_field(field_name)
+                self.assertIsInstance(field, field_type)
+                self.assertEqual(field.max_length, max_length)
+
+        self.assertTrue(LocalVoice._meta.get_field("original_file_name").unique)
+        self.assertEqual(LocalVoice._meta.get_field("language").default, "local")
+        self.assertEqual(
+            LocalVoice._meta.get_field("language_label").default, "当地讲述"
+        )
+        self.assertEqual(LocalVoice._meta.get_field("display_order").default, 0)
+        self.assertIs(LocalVoice._meta.get_field("is_active").default, True)
+
+    def test_model_metadata_and_string_representation(self):
+        voice = LocalVoice(title="碧江乡音")
+
+        self.assertEqual(LocalVoice._meta.db_table, "local_voices")
+        self.assertEqual(LocalVoice._meta.ordering, ("display_order", "id"))
+        self.assertEqual(LocalVoice._meta.verbose_name, "当地声音")
+        self.assertEqual(LocalVoice._meta.verbose_name_plural, "当地声音")
+        self.assertEqual(str(voice), "碧江乡音")
 
 
 class DomainModelContractTests(SimpleTestCase):

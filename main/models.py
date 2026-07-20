@@ -166,6 +166,27 @@ class AudioAsset(models.Model):
         return self.file_name
 
 
+class LocalVoice(models.Model):
+    id = models.AutoField("ID", primary_key=True)
+    title = models.CharField("标题", max_length=100)
+    original_file_name = models.CharField("原始文件名", max_length=100, unique=True)
+    file_url = models.TextField("音频文件地址")
+    duration_seconds = models.PositiveIntegerField("音频时长（秒）")
+    language = models.CharField("语言", max_length=20, default="local")
+    language_label = models.CharField("语言标签", max_length=20, default="当地讲述")
+    display_order = models.PositiveSmallIntegerField("后台排序", default=0)
+    is_active = models.BooleanField("是否启用", default=True)
+
+    class Meta:
+        db_table = "local_voices"
+        ordering = ("display_order", "id")
+        verbose_name = "当地声音"
+        verbose_name_plural = "当地声音"
+
+    def __str__(self):
+        return self.title
+
+
 class Theme(models.Model):
     id = models.AutoField("ID", primary_key=True)
     name = models.CharField("主题名称", max_length=20, unique=True)
