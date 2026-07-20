@@ -602,4 +602,19 @@ describe('Bijiang village website', () => {
     expect(wrapper.get('[data-local-voice-range="2"]').element.value).toBe('0')
     expect(wrapper.find('[role="status"]').text()).not.toContain('播放失败')
   })
+
+  it('does not multiply media listeners when pausing and resuming', async () => {
+    const addEventListener = vi.fn()
+    const audio = { pause: vi.fn(), play: vi.fn(() => Promise.resolve()), currentTime: 0, addEventListener, removeEventListener: vi.fn() }
+    vi.stubGlobal('Audio', vi.fn(function AudioMock() { return audio }))
+    history.replaceState({}, '', '/#stories')
+    const wrapper = mount(App, { attachTo: document.body })
+    await flushPromises()
+    await wrapper.get('[data-local-voice-id="1"]').trigger('click')
+    await wrapper.get('[data-local-voice-id="1"]').trigger('click')
+    await wrapper.get('[data-local-voice-id="1"]').trigger('click')
+
+    expect(addEventListener).toHaveBeenCalledTimes(3)
+    expect(addEventListener.mock.calls.map(([name]) => name)).toEqual(['timeupdate', 'ended', 'error'])
+  })
 })

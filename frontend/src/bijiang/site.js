@@ -649,11 +649,14 @@ let toastTimer;
 let audioTimer;
 let destroyed = false;
 let localAudio = null;
+let localAudioCleanup = null;
 let localVoiceRequestToken = 0;
 
 function stopLocalVoice() {
   localVoiceRequestToken += 1;
   localAudio?.pause();
+  localAudioCleanup?.();
+  localAudioCleanup = null;
   if (localAudio) localAudio.currentTime = 0;
   localAudio = null;
   state.activeLocalVoiceId = null;
@@ -661,26 +664,34 @@ function stopLocalVoice() {
   state.localVoiceCurrentTime = 0;
 }
 
-function bindLocalVoiceEvents(audio, token, voiceId) {
-  const isCurrent = () => audio === localAudio && token === localVoiceRequestToken && state.activeLocalVoiceId === voiceId;
-  audio.addEventListener("timeupdate", () => {
+function bindLocalVoiceEvents(audio, voiceId) {
+  const isCurrent = () => audio === localAudio && state.activeLocalVoiceId === voiceId;
+  const handleTimeUpdate = () => {
     if (!isCurrent()) return;
     state.localVoiceCurrentTime = Number.isFinite(audio.currentTime) && audio.currentTime >= 0 ? audio.currentTime : 0;
     const range = app.querySelector("[data-local-voice-range]");
     if (range) range.value = String(state.localVoiceCurrentTime);
-  });
-  audio.addEventListener("ended", () => {
+  };
+  const handleEnded = () => {
     if (!isCurrent()) return;
     state.localVoicePlaying = false;
     state.localVoiceCurrentTime = 0;
     if (!destroyed && state.view === "stories") transition(render);
-  });
-  audio.addEventListener("error", () => {
+  };
+  const handleError = () => {
     if (!isCurrent()) return;
     state.localVoicePlaying = false;
     showToast("播放失败，请稍后重试");
     if (!destroyed && state.view === "stories") transition(render);
-  });
+  };
+  audio.addEventListener("timeupdate", handleTimeUpdate);
+  audio.addEventListener("ended", handleEnded);
+  audio.addEventListener("error", handleError);
+  return () => {
+    audio.removeEventListener?.("timeupdate", handleTimeUpdate);
+    audio.removeEventListener?.("ended", handleEnded);
+    audio.removeEventListener?.("error", handleError);
+  };
 }
 
 function render() {
@@ -1209,7 +1220,6 @@ const handleClick = (event) => {
         state.localVoicePlaying = false;
       } else {
         const token = ++localVoiceRequestToken;
-        bindLocalVoiceEvents(localAudio, token, voiceId);
         state.localVoicePlaying = true;
         void localAudio.play().then(() => {
           if (token === localVoiceRequestToken && state.activeLocalVoiceId === voiceId) transition(render);
@@ -1223,12 +1233,13 @@ const handleClick = (event) => {
     } else {
       localVoiceRequestToken += 1;
       localAudio?.pause();
+      localAudioCleanup?.();
       localAudio = new Audio();
       state.activeLocalVoiceId = voiceId;
       state.localVoiceCurrentTime = 0;
       localAudio.src = voice.file_url;
       const token = ++localVoiceRequestToken;
-      bindLocalVoiceEvents(localAudio, token, voiceId);
+      localAudioCleanup = bindLocalVoiceEvents(localAudio, voiceId);
       state.localVoicePlaying = true;
       void localAudio.play().then(() => {
         if (token === localVoiceRequestToken && state.activeLocalVoiceId === voiceId) transition(render);
