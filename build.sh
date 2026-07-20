@@ -8,3 +8,5 @@ corepack pnpm --dir frontend install --frozen-lockfile
 corepack pnpm --dir frontend build
 
 python manage.py collectstatic --noinput
+python manage.py migrate --noinput
+python manage.py seed_demo_data
