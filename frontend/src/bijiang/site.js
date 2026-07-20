@@ -10,60 +10,60 @@ import {
 } from '../api.js'
 
 export function createBijiangSite(app, toast) {
-const villageMapUrl = new URL('./assets/village-map.png', import.meta.url).href;
-const ancestralHallUrl = new URL('./assets/ancestral-hall.png', import.meta.url).href;
-const pendantImg = new URL('./assets/挂件.png', import.meta.url).href;
-const sensorImg = new URL('./assets/感应装置.png', import.meta.url).href;
-const langImg = new URL('./assets/多语言支持.png', import.meta.url).href;
-const navImg = new URL('./assets/路线智能导航.png', import.meta.url).href;
-const storyBgImg = new URL('./assets/碧江故事.png', import.meta.url).href;
-const bridgeStoryImg = new URL('./assets/一座古桥，连起几代人的时光.png', import.meta.url).href;
-const oldPierImg = new URL('./assets/老码头记忆.png', import.meta.url).href;
-const overviewImg = new URL('./assets/村落概览.png', import.meta.url).href;
-const clanImg = new URL('./assets/宗祠家风.png', import.meta.url).href;
-const watersideImg = new URL('./assets/古桥与水流.png', import.meta.url).href;
-const poetryImg = new URL('./assets/诗词与巷道.png', import.meta.url).href;
+const villageMapUrl = new URL('./assets/village-map.webp', import.meta.url).href;
+const ancestralHallUrl = new URL('./assets/ancestral-hall.webp', import.meta.url).href;
+const pendantImg = new URL('./assets/挂件.webp', import.meta.url).href;
+const sensorImg = new URL('./assets/感应装置.webp', import.meta.url).href;
+const langImg = new URL('./assets/多语言支持.webp', import.meta.url).href;
+const navImg = new URL('./assets/路线智能导航.webp', import.meta.url).href;
+const storyBgImg = new URL('./assets/碧江故事.webp', import.meta.url).href;
+const bridgeStoryImg = new URL('./assets/一座古桥，连起几代人的时光.webp', import.meta.url).href;
+const oldPierImg = new URL('./assets/老码头记忆.webp', import.meta.url).href;
+const overviewImg = new URL('./assets/村落概览.webp', import.meta.url).href;
+const clanImg = new URL('./assets/宗祠家风.webp', import.meta.url).href;
+const watersideImg = new URL('./assets/古桥与水流.webp', import.meta.url).href;
+const poetryImg = new URL('./assets/诗词与巷道.webp', import.meta.url).href;
 const placeImgUrls = {
-  "huang-ancestral-hall": new URL('./assets/黄氏宗祠.png', import.meta.url).href,
-  "village-history-museum": new URL('./assets/村史馆.png', import.meta.url).href,
-  "bixi-scholar-hall": new URL('./assets/碧溪书公祠.png', import.meta.url).href,
-  "dong-ancestral-hall": new URL('./assets/东氏宗祠.png', import.meta.url).href,
-  "ancient-bridge": new URL('./assets/古桥.png', import.meta.url).href,
-  "poetry-lane": new URL('./assets/诗词巷.png', import.meta.url).href,
-  "xiuxi-peng-ancestral-hall": new URL('./assets/绣西彭公祠.png', import.meta.url).href,
-  "old-wharf": new URL('./assets/老码头.png', import.meta.url).href,
-  "waterside-ancient-tree": new URL('./assets/水岸古树.png', import.meta.url).href,
+  "huang-ancestral-hall": new URL('./assets/黄氏宗祠.webp', import.meta.url).href,
+  "village-history-museum": new URL('./assets/村史馆.webp', import.meta.url).href,
+  "bixi-scholar-hall": new URL('./assets/碧溪书公祠.webp', import.meta.url).href,
+  "dong-ancestral-hall": new URL('./assets/东氏宗祠.webp', import.meta.url).href,
+  "ancient-bridge": new URL('./assets/古桥.webp', import.meta.url).href,
+  "poetry-lane": new URL('./assets/诗词巷.webp', import.meta.url).href,
+  "xiuxi-peng-ancestral-hall": new URL('./assets/绣西彭公祠.webp', import.meta.url).href,
+  "old-wharf": new URL('./assets/老码头.webp', import.meta.url).href,
+  "waterside-ancient-tree": new URL('./assets/水岸古树.webp', import.meta.url).href,
 };
 const walkImg = new URL('./assets/今日已步行(1)(1).png', import.meta.url).href;
 const unlockImg = new URL('./assets/今日已步行(1)(2).png', import.meta.url).href;
 const moduleIconUrls = {
-  "module-interest": new URL('./assets/module-interest.png', import.meta.url).href,
-  "module-map": new URL('./assets/module-map.png', import.meta.url).href,
-  "module-stamp": new URL('./assets/module-stamp.png', import.meta.url).href,
-  "module-story": new URL('./assets/module-story.png', import.meta.url).href,
+  "module-interest": new URL('./assets/module-interest.webp', import.meta.url).href,
+  "module-map": new URL('./assets/module-map.webp', import.meta.url).href,
+  "module-stamp": new URL('./assets/module-stamp.webp', import.meta.url).href,
+  "module-story": new URL('./assets/module-story.webp', import.meta.url).href,
 };
-const profileAvatarImg = new URL('./assets/游客.png', import.meta.url).href;
-const profileBgImg = new URL('./assets/游客背景图.png', import.meta.url).href;
-const footprintIconImg = new URL('./assets/足迹.png', import.meta.url).href;
-const footprintBgImg = new URL('./assets/足迹背景图.png', import.meta.url).href;
-const storyIconImg = new URL('./assets/收藏故事.png', import.meta.url).href;
-const collectStoryBgImg = new URL('./assets/收藏故事背景图.png', import.meta.url).href;
-const deviceIconImg = new URL('./assets/设备管理.png', import.meta.url).href;
-const historyIconImg = new URL('./assets/历史路线.png', import.meta.url).href;
-const historyBgImg = new URL('./assets/历史路线背景图.png', import.meta.url).href;
+const profileAvatarImg = new URL('./assets/游客.webp', import.meta.url).href;
+const profileBgImg = new URL('./assets/游客背景图.webp', import.meta.url).href;
+const footprintIconImg = new URL('./assets/足迹.webp', import.meta.url).href;
+const footprintBgImg = new URL('./assets/足迹背景图.webp', import.meta.url).href;
+const storyIconImg = new URL('./assets/收藏故事.webp', import.meta.url).href;
+const collectStoryBgImg = new URL('./assets/收藏故事背景图.webp', import.meta.url).href;
+const deviceIconImg = new URL('./assets/设备管理.webp', import.meta.url).href;
+const historyIconImg = new URL('./assets/历史路线.webp', import.meta.url).href;
+const historyBgImg = new URL('./assets/历史路线背景图.webp', import.meta.url).href;
 
-const interestBgImg = new URL('./assets/兴趣路线背景图.png', import.meta.url).href;
-const routePreviewImg = new URL('./assets/路线预览.png', import.meta.url).href;
+const interestBgImg = new URL('./assets/兴趣路线背景图.webp', import.meta.url).href;
+const routePreviewImg = new URL('./assets/路线预览.webp', import.meta.url).href;
 
 const interestIconMap = {
-  "古建筑": new URL('./assets/古建筑.png', import.meta.url).href,
-  "宗族故事": new URL('./assets/宗族故事.png', import.meta.url).href,
-  "人物旧居": new URL('./assets/人物旧居.png', import.meta.url).href,
-  "诗词记忆": new URL('./assets/诗词记忆.png', import.meta.url).href,
-  "巷道漫游": new URL('./assets/巷道漫游.png', import.meta.url).href,
-  "民俗生活": new URL('./assets/民俗生活.png', import.meta.url).href,
-  "水岸风景": new URL('./assets/水岸风景.png', import.meta.url).href,
-  "亲子体验": new URL('./assets/亲子体验.png', import.meta.url).href,
+  "古建筑": new URL('./assets/古建筑.webp', import.meta.url).href,
+  "宗族故事": new URL('./assets/宗族故事.webp', import.meta.url).href,
+  "人物旧居": new URL('./assets/人物旧居.webp', import.meta.url).href,
+  "诗词记忆": new URL('./assets/诗词记忆.webp', import.meta.url).href,
+  "巷道漫游": new URL('./assets/巷道漫游.webp', import.meta.url).href,
+  "民俗生活": new URL('./assets/民俗生活.webp', import.meta.url).href,
+  "水岸风景": new URL('./assets/水岸风景.webp', import.meta.url).href,
+  "亲子体验": new URL('./assets/亲子体验.webp', import.meta.url).href,
 };
 
 const icon = (name, className = "") =>

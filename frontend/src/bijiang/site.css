@@ -319,7 +319,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .stamp-card { position: relative; min-height: 270px; padding: 18px; overflow: hidden; border: 1px solid #d3bd9e; border-radius: 18px 8px 18px 8px; background: #fffaf1; cursor: pointer; transition: transform .22s; }
 .stamp-card:hover { transform: translateY(-5px) rotate(-.25deg); }
 .stamp-card::after { position: absolute; inset: 6px; pointer-events: none; border: 1px dashed #cbb28e; border-radius: 13px 5px; content: ""; }
-.stamp-scene { height: 180px; border-radius: 10px; background: url("./assets/village-map.png") var(--pos) center/280% auto; filter: saturate(.8); }
+.stamp-scene { height: 180px; border-radius: 10px; background: url("./assets/village-map.webp") var(--pos) center/280% auto; filter: saturate(.8); }
 .stamp-card strong { position: relative; z-index: 2; display: block; margin-top: 14px; font: 700 21px var(--serif); }
 .stamp-seal { position: absolute; z-index: 3; right: 10px; bottom: 8px; padding: 8px; rotate: -12deg; color: #bd5f36; border: 2px solid currentColor; border-radius: 50%; font: 700 15px var(--serif); }
 .stamp-card.is-locked .stamp-scene { filter: grayscale(1) opacity(.42); }
@@ -682,7 +682,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 
 .heritage-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
 .heritage-grid article { overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: #fffaf2; }
-.heritage-image { position: relative; height: 175px; background: url("./assets/village-map.png") var(--pos) center/290% auto; }
+.heritage-image { position: relative; height: 175px; background: url("./assets/village-map.webp") var(--pos) center/290% auto; }
 .heritage-image span { position: absolute; top: 12px; left: 12px; display: grid; place-items: center; width: 38px; height: 38px; color: var(--blue); border-radius: 50%; background: rgb(255 250 241 / 86%); }
 .heritage-grid h2 { margin: 18px 18px 8px; font: 700 24px var(--serif); }
 .heritage-grid p { margin: 0 18px 22px; color: var(--muted); font: 500 14px/1.8 var(--serif); }
@@ -697,7 +697,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .shrine-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
 .shrine-grid button { position: relative; padding: 14px 14px 26px; overflow: hidden; text-align: left; border: 1px solid var(--line); border-radius: 18px; background: #fffaf3; cursor: pointer; transition: transform .24s, box-shadow .24s; }
 .shrine-grid button:hover { transform: translateY(-5px); box-shadow: var(--shadow); }
-.shrine-image { height: 230px; border-radius: 12px; background: url("./assets/ancestral-hall.png") var(--pos) center/cover; }
+.shrine-image { height: 230px; border-radius: 12px; background: url("./assets/ancestral-hall.webp") var(--pos) center/cover; }
 .shrine-grid h3 { margin: 18px 6px 10px; text-align: center; font: 700 25px var(--serif); }
 .shrine-grid p { margin: 0 6px; color: var(--muted); font: 500 14px/1.9 var(--serif); }
 .shrine-grid .card-arrow { position: absolute; right: 18px; bottom: 16px; }
@@ -714,7 +714,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .waterside-topic-grid article { min-width: 0; padding: 18px; }
 .waterside-topic-grid article + article { border-left: 1px solid var(--line); }
 .waterside-topic-grid h2 { margin: 0 0 14px; text-align: center; font: 700 23px var(--serif); }
-.waterside-topic-grid article > div { height: 190px; border-radius: 12px; background: url("./assets/village-map.png") var(--pos) center/330% auto; }
+.waterside-topic-grid article > div { height: 190px; border-radius: 12px; background: url("./assets/village-map.webp") var(--pos) center/330% auto; }
 .waterside-topic-grid p { color: var(--muted); font: 500 14px/1.8 var(--serif); }
 .waterside-clue { display: grid; grid-template-columns: 2fr .7fr; gap: 32px; align-items: center; }
 .clue-map { position: relative; height: 280px; overflow: hidden; border-radius: 16px; }
@@ -733,10 +733,10 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .poetry-object .icon { width: 58px; height: 58px; }
 .poetry-band h2 { margin: 0 0 12px; font: 700 27px var(--serif); }
 .poetry-band p { margin: 5px 0; color: var(--muted); font: 500 16px/1.9 var(--serif); }
-.band-image { height: 220px; border-radius: 18px; background: url("./assets/ancestral-hall.png") var(--pos) center/cover; }
+.band-image { height: 220px; border-radius: 18px; background: url("./assets/ancestral-hall.webp") var(--pos) center/cover; }
 .poetry-detail-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 .poetry-detail-grid article { text-align: center; }
-.poetry-detail-grid article > div { position: relative; height: 160px; border-radius: 14px; background: url("./assets/ancestral-hall.png") var(--pos) center/280% auto; }
+.poetry-detail-grid article > div { position: relative; height: 160px; border-radius: 14px; background: url("./assets/ancestral-hall.webp") var(--pos) center/280% auto; }
 .poetry-detail-grid article > div span { position: absolute; top: 10px; left: 10px; display: grid; place-items: center; width: 38px; height: 38px; color: var(--blue); border-radius: 50%; background: rgb(255 250 242 / 85%); }
 .poetry-detail-grid h3 { margin: 14px 0 7px; font: 700 21px var(--serif); }
 .poetry-detail-grid p { margin: 0; color: var(--muted); font: 500 13px/1.8 var(--serif); }
