@@ -36,3 +36,11 @@ services:
         sync: false
       - key: DJANGO_SUPERUSER_PASSWORD
         sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: DEEPSEEK_MODEL
+        value: DeepSeek-V4-Pro
+      - key: DEEPSEEK_BASE_URL
+        value: https://api.ldwnb666.xyz/v1
+      - key: DEEPSEEK_TIMEOUT_SECONDS
+        value: "60"

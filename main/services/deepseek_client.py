@@ -33,6 +33,19 @@ REQUIRED_ANALYSIS_FIELDS = {
 }
 
 
+def _parse_analysis_content(content):
+    if not isinstance(content, str):
+        raise DeepSeekResponseError("DeepSeek returned an invalid response.")
+    normalized = content.strip()
+    if normalized.startswith("```") and normalized.endswith("```"):
+        lines = normalized.splitlines()
+        normalized = "\n".join(lines[1:-1]).strip()
+    try:
+        return json.loads(normalized)
+    except json.JSONDecodeError as exc:
+        raise DeepSeekResponseError("DeepSeek returned an invalid response.") from exc
+
+
 def analyze_visitor_metrics(question, metrics, history=None):
     api_key = settings.DEEPSEEK_API_KEY.strip()
     if not api_key:
@@ -71,7 +84,6 @@ def analyze_visitor_metrics(question, metrics, history=None):
     payload = {
         "model": settings.DEEPSEEK_MODEL,
         "temperature": 0.2,
-        "response_format": {"type": "json_object"},
         "messages": messages,
     }
     request = Request(
@@ -85,7 +97,9 @@ def analyze_visitor_metrics(question, metrics, history=None):
     )
 
     try:
-        with urlopen(request, timeout=settings.DEEPSEEK_TIMEOUT_SECONDS) as response:
+        with urlopen(
+            request, timeout=min(settings.DEEPSEEK_TIMEOUT_SECONDS, 60)
+        ) as response:
             response_payload = json.loads(response.read().decode("utf-8"))
     except (socket.timeout, TimeoutError) as exc:
         raise DeepSeekTimeoutError("DeepSeek request timed out.") from exc
@@ -102,9 +116,9 @@ def analyze_visitor_metrics(question, metrics, history=None):
 
     try:
         content = response_payload["choices"][0]["message"]["content"]
-        analysis = json.loads(content)
-    except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
+    except (KeyError, IndexError, TypeError) as exc:
         raise DeepSeekResponseError("DeepSeek returned an invalid response.") from exc
+    analysis = _parse_analysis_content(content)
 
     if not isinstance(analysis, dict) or any(
         not isinstance(analysis.get(field), expected_type)

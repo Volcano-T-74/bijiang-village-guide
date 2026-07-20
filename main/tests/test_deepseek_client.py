@@ -85,8 +85,31 @@ class DeepSeekClientTests(SimpleTestCase):
         payload = json.loads(request.data.decode("utf-8"))
         self.assertEqual(request.full_url, "https://api.deepseek.com/chat/completions")
         self.assertEqual(payload["model"], "deepseek-chat")
+        self.assertNotIn("response_format", payload)
         self.assertNotIn("00000000-0000-0000-0000-000000000000", request.data.decode())
         self.assertEqual(mocked_urlopen.call_args.kwargs["timeout"], 12)
+
+    @patch("main.services.deepseek_client.urlopen")
+    def test_accepts_json_inside_markdown_code_fence(self, mocked_urlopen):
+        fenced = f"```json\n{json.dumps(ANALYSIS, ensure_ascii=False)}\n```"
+        mocked_urlopen.return_value = mock_response(
+            {"choices": [{"message": {"content": fenced}}]}
+        )
+
+        result = analyze_visitor_metrics("问题", METRICS)
+
+        self.assertEqual(result, ANALYSIS)
+
+    @override_settings(DEEPSEEK_TIMEOUT_SECONDS=120)
+    @patch("main.services.deepseek_client.urlopen")
+    def test_caps_provider_timeout_below_gunicorn_timeout(self, mocked_urlopen):
+        mocked_urlopen.return_value = mock_response(
+            {"choices": [{"message": {"content": json.dumps(ANALYSIS)}}]}
+        )
+
+        analyze_visitor_metrics("问题", METRICS)
+
+        self.assertEqual(mocked_urlopen.call_args.kwargs["timeout"], 60)
 
     @override_settings(DEEPSEEK_API_KEY="")
     def test_requires_api_key(self):
