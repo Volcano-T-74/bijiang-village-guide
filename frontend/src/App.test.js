@@ -99,6 +99,16 @@ describe('Bijiang village website', () => {
     expect(wrapper.find('.route-stop .card-arrow').exists()).toBe(false)
   })
 
+  it('starts every stamp locked and derives progress from visited places', async () => {
+    history.replaceState({}, '', '/#stamps')
+    const wrapper = mount(App, { attachTo: document.body })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('已点亮 0 / 1 个印章点')
+    expect(wrapper.findAll('.stamp-card.is-locked')).toHaveLength(1)
+    expect(wrapper.findAll('.stamp-card.is-lit')).toHaveLength(0)
+  })
+
   it('reuses a stored visitor session instead of creating another one', async () => {
     localStorage.setItem('bijiang_visitor_session_id', 'stored-session')
     mount(App, { attachTo: document.body })

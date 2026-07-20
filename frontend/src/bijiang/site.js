@@ -198,17 +198,24 @@ function renderHome() {
 }
 
 function renderStamps() {
+  const litCount = places.filter(place => state.visitedSlugs.has(place.slug)).length;
   return shell(`
     <header class="page-hero reveal"><div><h1>集章寻迹</h1><p>步履所至，皆为故事；印章点亮，记一方水岸。</p></div></header>
-    <section class="stamp-progress reveal"><strong>已点亮 <b>6</b> / ${places.length} 个印章点</strong><div>${places.map((_, i) => `<span class="mini-stamp ${i < 6 ? "lit" : ""}">${i < 6 ? "碧" : ""}</span>`).join("")}</div></section>
+    <section class="stamp-progress reveal"><strong>已点亮 <b>${litCount}</b> / ${places.length} 个印章点</strong><div>${places.map(place => {
+      const isLit = state.visitedSlugs.has(place.slug);
+      return `<span class="mini-stamp ${isLit ? "lit" : ""}" aria-label="${place.name}${isLit ? "已点亮" : "待解锁"}">${isLit ? "碧" : ""}</span>`;
+    }).join("")}</div></section>
     <section class="stamp-grid reveal" aria-label="印章点列表">
-      ${places.map((place, i) => `
-        <button class="stamp-card ${i < 6 ? "is-lit" : "is-locked"}" data-action="stamp" data-index="${i}" aria-label="${place.name}${i < 6 ? "已点亮" : "待解锁"}">
+      ${places.map((place, i) => {
+        const isLit = state.visitedSlugs.has(place.slug);
+        return `
+        <button class="stamp-card ${isLit ? "is-lit" : "is-locked"}" data-action="stamp" data-index="${i}" aria-label="${place.name}${isLit ? "已点亮" : "待解锁"}">
           <div class="stamp-scene" style="background-image: url('${placeImgUrls[place.slug] || place.cover_image_url}'); background-size: cover; background-position: center; background-repeat: no-repeat;"></div>
           <strong>${place.name}</strong>
-          ${i < 6 ? `<span class="stamp-seal">已点亮</span>` : icon("lock", "lock-icon")}
+          ${isLit ? `<span class="stamp-seal">已点亮</span>` : icon("lock", "lock-icon")}
         </button>
-      `).join("")}
+      `;
+      }).join("")}
     </section>
     <section class="unlock-card reveal">
   <div>
