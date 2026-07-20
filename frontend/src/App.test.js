@@ -137,6 +137,9 @@ describe('Bijiang village website', () => {
     expect(wrapper.text()).not.toContain('已收藏故事')
     expect(wrapper.findAll('.profile-footprint-item')).toHaveLength(1)
     expect(wrapper.findAll('.profile-history-item')).toHaveLength(1)
+    expect(wrapper.find('.profile-card img[alt="游客"]').attributes('loading')).toBe('eager')
+    expect(wrapper.findAll('.profile-section-card')).toHaveLength(2)
+    expect(wrapper.findAll('.profile-section-art')).toHaveLength(2)
   })
 
   it('keeps only five unique route history entries with the newest first', async () => {
@@ -180,7 +183,7 @@ describe('Bijiang village website', () => {
     const css = readFileSync(resolve(process.cwd(), 'src/bijiang/site.css'), 'utf8')
 
     expect(css).toMatch(/\.profile-empty p\s*\{[^}]*white-space:\s*normal/)
-    expect(css).toMatch(/@media \(max-width: 480px\)[\s\S]*?\.profile-heading\s*\{[^}]*flex-wrap:\s*wrap/)
+    expect(css).toMatch(/@media \(max-width: 480px\)[\s\S]*?\.profile-card-person\s*\{[^}]*flex-wrap:\s*wrap/)
     expect(css).toMatch(/@media \(max-width: 480px\)[\s\S]*?\.device-body\s*\{[^}]*grid-template-columns:\s*1fr/)
   })
 

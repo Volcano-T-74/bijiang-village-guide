@@ -42,7 +42,13 @@ const moduleIconUrls = {
   "module-stamp": new URL('./assets/module-stamp.webp', import.meta.url).href,
   "module-story": new URL('./assets/module-story.webp', import.meta.url).href,
 };
+const profileAvatarImg = new URL('./assets/游客.webp', import.meta.url).href;
+const profileBgImg = new URL('./assets/游客背景图.webp', import.meta.url).href;
+const footprintIconImg = new URL('./assets/足迹.webp', import.meta.url).href;
+const footprintBgImg = new URL('./assets/足迹背景图.webp', import.meta.url).href;
 const deviceIconImg = new URL('./assets/设备管理.webp', import.meta.url).href;
+const historyIconImg = new URL('./assets/历史路线.webp', import.meta.url).href;
+const historyBgImg = new URL('./assets/历史路线背景图.webp', import.meta.url).href;
 
 const interestBgImg = new URL('./assets/兴趣路线背景图.webp', import.meta.url).href;
 const routePreviewImg = new URL('./assets/路线预览.webp', import.meta.url).href;
@@ -355,17 +361,23 @@ function renderProfile() {
     : `<div class="profile-empty">${icon("route")}<strong>还没有历史路线</strong><p>完成一次兴趣路线生成后，最近 5 条路线会保存在这里。</p></div>`;
 
   return shell(`
-    <header class="simple-header profile-heading reveal">
-      <div><h1>我的</h1><p>足迹、路线与随身设备</p></div>
-      <strong>${visitedPlaces.length}<small> / ${places.length || 9} 枚邮章</small></strong>
-    </header>
+    <header class="simple-header reveal"><h1>我的</h1></header>
+    <section class="profile-card reveal">
+      <div class="profile-card-person">
+        <div class="profile-avatar"><img src="${profileAvatarImg}" alt="游客" /></div>
+        <div><h2>游客</h2><p>今日正在探索碧江村</p><strong>${visitedPlaces.length} / ${places.length || 9} 枚邮章已点亮</strong></div>
+      </div>
+      <img class="profile-card-art" src="${profileBgImg}" alt="" />
+    </section>
     <div class="profile-dashboard">
-      <section class="profile-section reveal" aria-labelledby="profile-footprints-title">
-        <div class="profile-section-heading"><div>${icon("pin")}<span><h2 id="profile-footprints-title">我的足迹</h2><p>按模拟到达顺序记录</p></span></div><strong>${visitedPlaces.length}</strong></div>
+      <section class="profile-section profile-section-card reveal" aria-labelledby="profile-footprints-title">
+        <img class="profile-section-art" src="${footprintBgImg}" alt="" />
+        <div class="profile-section-heading"><div><img src="${footprintIconImg}" alt="" /><span><h2 id="profile-footprints-title">我的足迹</h2><p>按模拟到达顺序记录</p></span></div><strong>${visitedPlaces.length}</strong></div>
         ${footprintContent}
       </section>
-      <section class="profile-section reveal" aria-labelledby="profile-history-title">
-        <div class="profile-section-heading"><div>${icon("route")}<span><h2 id="profile-history-title">历史路线</h2><p>最近生成的 5 条路线</p></span></div><strong>${history.length}</strong></div>
+      <section class="profile-section profile-section-card reveal" aria-labelledby="profile-history-title">
+        <img class="profile-section-art" src="${historyBgImg}" alt="" />
+        <div class="profile-section-heading"><div><img src="${historyIconImg}" alt="" /><span><h2 id="profile-history-title">历史路线</h2><p>最近生成的 5 条路线</p></span></div><strong>${history.length}</strong></div>
         ${historyContent}
       </section>
     </div>
@@ -723,6 +735,8 @@ function render() {
     homeHeroImage.setAttribute("loading", "eager");
     homeHeroImage.setAttribute("fetchpriority", "high");
   }
+  const profileAvatar = app.querySelector(".profile-avatar img");
+  if (profileAvatar) profileAvatar.setAttribute("loading", "eager");
   const attractionTitle = state.attractionDetail?.name || "景点故事";
   document.title = `${({home:"首页",stamps:"集章寻迹",stories:"碧江故事",profile:"我的",interests:"兴趣路线",route:"我的路线",attraction:attractionTitle,ancestral:"黄氏宗祠",overview:"村落概览",clan:"宗祠与家风",waterside:"古桥与水岸",poetry:"诗词与巷道"})[state.view]} · 碧江寻迹`;
   const stampBackdrop = app.querySelector("[data-dismiss-stamp-unlock]");
