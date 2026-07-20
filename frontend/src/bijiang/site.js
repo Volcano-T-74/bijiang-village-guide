@@ -65,21 +65,37 @@ const interestIconMap = {
   "亲子体验": new URL('./assets/亲子体验.png', import.meta.url).href,
 };
 
-const totalMapImg = new URL('./assets/total-map.png', import.meta.url).href;
-
 const icon = (name, className = "") =>
   `<svg class="icon ${className}" aria-hidden="true"><use href="#i-${name}"></use></svg>`;
 
 let interests = [];
 let places = [];
 
+const DEMO_STORAGE_KEY = 'bijiang_indoor_demo_state';
+
+function readDemoState() {
+  try {
+    return JSON.parse(localStorage.getItem(DEMO_STORAGE_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+const savedDemoState = readDemoState();
+
 const state = {
   view: location.hash.slice(1) || "home",
-  interests: new Set(["岭南建筑", "诗书文脉"]),
-  duration: 60,
-  mode: "relaxed",
-  route: null,
+  interests: new Set(savedDemoState.interests || ["岭南建筑", "诗书文脉"]),
+  duration: savedDemoState.duration || 60,
+  mode: savedDemoState.mode || "relaxed",
+  route: savedDemoState.route || null,
   generating: false,
+  pendingArrival: null,
+  currentSimulatedSlug: savedDemoState.currentSimulatedSlug || null,
+  visitedSlugs: new Set(savedDemoState.visitedSlugs || []),
+  locationStatus: "idle",
+  locationMessage: "",
+  realLocation: null,
   selectedAttraction: null,
   attractionDetail: null,
   detailLoading: false,
@@ -87,6 +103,17 @@ const state = {
   audioPlaying: false,
   audioProgress: 28,
 };
+
+function persistDemoState() {
+  localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify({
+    interests: Array.from(state.interests),
+    duration: state.duration,
+    mode: state.mode,
+    route: state.route,
+    currentSimulatedSlug: state.currentSimulatedSlug,
+    visitedSlugs: Array.from(state.visitedSlugs),
+  }));
+}
 
 const validViews = new Set(["home", "stamps", "stories", "profile", "interests", "route", "attraction", "ancestral", "overview", "clan", "waterside", "poetry"]);
 if (!validViews.has(state.view)) state.view = "home";
@@ -381,8 +408,17 @@ function renderRoute() {
   const route = state.route;
   const line = route.stops.map((stop, index) => `${index === 0 ? "M" : "L"}${stop.map_position.x} ${stop.map_position.y}`).join(" ");
   const modeLabel = route.mode === "deep" ? "深度走读" : "轻松逛";
+  const routeIndex = new Map(route.stops.map((stop, index) => [stop.slug, index + 1]));
+  const selectedPlace = places.find(place => place.slug === state.pendingArrival);
+  const locationContent = state.realLocation
+    ? `<strong>定位成功</strong><span>纬度 ${state.realLocation.latitude.toFixed(6)} · 经度 ${state.realLocation.longitude.toFixed(6)} · 误差约 ${Math.round(state.realLocation.accuracy)} 米</span>`
+    : `<strong>${state.locationStatus === "loading" ? "正在获取位置" : "真实位置"}</strong><span>${state.locationMessage || "仅在本机显示，不会上传后台"}</span>`;
   return shell(`
     <header class="subpage-header reveal"><h1>我的路线</h1><p>根据您的兴趣生成的专属路线</p></header>
+    <section class="location-panel reveal" data-location-status="${state.locationStatus}">
+      <div>${icon("pin")}<span>${locationContent}<small>室内定位可能存在较大误差，九点游览使用下方模拟地图。</small></span></div>
+      <button class="secondary-button" data-action="request-location" ${state.locationStatus === "loading" ? "disabled" : ""}>${state.realLocation ? "重新定位" : "获取我的位置"}</button>
+    </section>
     <section class="route-map reveal">
   <img
     src="${villageMapUrl}"
@@ -398,22 +434,24 @@ function renderRoute() {
     <path d="${line}" />
   </svg>
 
-  ${route.stops.map((stop, index) => `
+  ${places.map((place, index) => `
     <button
-      class="map-marker"
-      data-attraction-slug="${stop.slug}"
-      style="--x:${stop.map_position.x}%; --y:${stop.map_position.y}%"
-      aria-label="查看${stop.name}故事"
+      class="map-marker ${routeIndex.has(place.slug) ? "is-route" : ""} ${state.visitedSlugs.has(place.slug) ? "is-visited" : ""} ${state.currentSimulatedSlug === place.slug ? "is-current" : ""} ${state.pendingArrival === place.slug ? "is-pending" : ""}"
+      data-map-slug="${place.slug}"
+      style="--x:${place.map_position.x}%; --y:${place.map_position.y}%"
+      aria-label="选择${place.name}作为模拟位置"
+      aria-pressed="${state.pendingArrival === place.slug}"
     >
       ${index + 1}
     </button>
   `).join("")}
 </section>
+    ${selectedPlace ? `<section class="arrival-confirm reveal" aria-live="polite"><div><small>${selectedPlace.zone?.name || "碧江村"}</small><strong>${selectedPlace.name}</strong><p>${selectedPlace.subtitle || "确认后将这里设为你的模拟位置。"}</p></div><div><button class="secondary-button" data-action="cancel-arrival">取消</button><button class="primary-button" data-action="confirm-arrival">模拟到达此处</button></div></section>` : ""}
     <section class="route-stats reveal"><div>${icon("clock")}<span><strong>${route.total_estimated_minutes}分钟</strong><small>${modeLabel}</small></span></div><div>${icon("book")}<span><strong>${route.stops.length}个故事点</strong><small>评分 ${route.score}</small></span></div><div>${icon("walk")}<span><strong>${route.legs.reduce((sum, leg) => sum + leg.distance_meters, 0)}米</strong><small>预计步行</small></span></div></section>
     <section class="route-stop-list reveal">
       ${route.stops.map((stop, index) => `<button class="route-stop" data-attraction-slug="${stop.slug}"><span>${index + 1}</span><div><strong>${stop.name}</strong><small>${stop.zone.name} · ${stop.visit_minutes}分钟</small><p>${stop.recommendation}</p></div>${icon("arrow", "card-arrow")}</button>${route.legs[index] ? `<p class="route-bridge">${route.legs[index].narrative_bridge}</p>` : ""}`).join("")}
     </section>
-    <button class="primary-button orange wide reveal" data-attraction-slug="${route.stops[0].slug}">开始按线索探索 ${icon("arrow")}</button>
+    <p class="route-note reveal">点击地图上的任意景点，确认后即可更新模拟位置；偏离推荐路线时会从新位置重新规划。</p>
   `, { back: true, nav: false, className: "subpage route-view" });
 }
 
@@ -442,9 +480,9 @@ function renderAttractionDetail() {
 
 function renderOverview() {
   const labels = [
-    ["1", "村史馆", 40, 10], ["2", "碧溪书公祠", 67, 17], ["3", "黄氏宗祠", 19, 32],
-    ["4", "东氏宗祠", 76, 43], ["5", "古桥", 51, 47], ["6", "诗词巷", 24, 59],
-    ["7", "绣西彭公祠", 31, 77], ["8", "老码头", 68, 66], ["9", "水岸古树", 75, 85],
+    ["1", "村史馆", 42, 13], ["2", "碧溪书公祠", 69, 17], ["3", "黄氏宗祠", 14, 31],
+    ["4", "东氏宗祠", 77, 40], ["5", "古桥", 50, 45], ["6", "诗词巷", 21, 54],
+    ["7", "绣西彭公祠", 27, 73], ["8", "老码头", 68, 62], ["9", "水岸古树", 79, 79],
   ];
   const features = [
     ["宗祠文化", "多座宗祠保存完好，木雕、砖雕与石雕工艺精湛，承载家族记忆。", "building", 58],
@@ -579,17 +617,6 @@ async function initializeData() {
   try {
     await ensureVisitorSession();
     const data = await getBootstrap();
-    const fixedPositions = {
-   "village-history-museum": { x: 22, y: 18 },    // 村史馆 - 左上
-   "bixi-scholar-hall": { x: 48, y: 12 },          // 碧溪书公祠 - 上中
-   "huang-ancestral-hall": { x: 15, y: 35 },       // 黄氏宗祠 - 左中上
-   "dong-ancestral-hall": { x: 68, y: 28 },        // 东氏宗祠 - 右中上
-   "ancient-bridge": { x: 55, y: 45 },             // 古桥 - 中间
-   "poetry-lane": { x: 30, y: 58 },                // 诗词巷 - 左中下
-   "xiuxi-peng-ancestral-hall": { x: 45, y: 72 },  // 绣西彭公祠 - 中下
-   "old-wharf": { x: 72, y: 60 },                  // 老码头 - 右下
-   "waterside-ancient-tree": { x: 85, y: 78 },     // 水岸古树 - 右下角
-};
     if (destroyed) return;
     interests = data.themes.map(theme => [theme.name, theme.icon]);
     places = data.attractions;
@@ -617,7 +644,7 @@ async function initializeData() {
     slug: "village-history-museum", 
     name: "村史馆", 
     zone: { name: "村史区" },
-    map_position: { x: 20, y: 15 },   // 左上
+    map_position: { x: 42, y: 13 },
     tags: ["民俗生活", "人物旧居"],
     cover_image_url: placeImgUrls["village-history-museum"]
   },
@@ -625,7 +652,7 @@ async function initializeData() {
     slug: "bixi-scholar-hall", 
     name: "碧溪书公祠", 
     zone: { name: "宗祠区" },
-    map_position: { x: 48, y: 10 },   // 上中
+    map_position: { x: 69, y: 17 },
     tags: ["古建筑", "诗词记忆"],
     cover_image_url: placeImgUrls["bixi-scholar-hall"]
   },
@@ -633,7 +660,7 @@ async function initializeData() {
     slug: "huang-ancestral-hall", 
     name: "黄氏宗祠", 
     zone: { name: "宗祠区" },
-    map_position: { x: 15, y: 32 },   // 左中上
+    map_position: { x: 14, y: 31 },
     tags: ["古建筑", "宗族故事"],
     cover_image_url: placeImgUrls["huang-ancestral-hall"]
   },
@@ -641,7 +668,7 @@ async function initializeData() {
     slug: "dong-ancestral-hall", 
     name: "东氏宗祠", 
     zone: { name: "宗祠区" },
-    map_position: { x: 72, y: 25 },   // 右中上
+    map_position: { x: 77, y: 40 },
     tags: ["古建筑", "宗族故事"],
     cover_image_url: placeImgUrls["dong-ancestral-hall"]
   },
@@ -649,7 +676,7 @@ async function initializeData() {
     slug: "ancient-bridge", 
     name: "古桥", 
     zone: { name: "水岸区" },
-    map_position: { x: 55, y: 45 },   // 中间
+    map_position: { x: 50, y: 45 },
     tags: ["水岸风景", "巷道漫游"],
     cover_image_url: placeImgUrls["ancient-bridge"]
   },
@@ -657,7 +684,7 @@ async function initializeData() {
     slug: "poetry-lane", 
     name: "诗词巷", 
     zone: { name: "巷道区" },
-    map_position: { x: 28, y: 58 },   // 左中下
+    map_position: { x: 21, y: 54 },
     tags: ["诗词记忆", "巷道漫游"],
     cover_image_url: placeImgUrls["poetry-lane"]
   },
@@ -665,7 +692,7 @@ async function initializeData() {
     slug: "xiuxi-peng-ancestral-hall", 
     name: "绣西彭公祠", 
     zone: { name: "宗祠区" },
-    map_position: { x: 45, y: 72 },   // 中下
+    map_position: { x: 27, y: 73 },
     tags: ["古建筑", "人物旧居"],
     cover_image_url: placeImgUrls["xiuxi-peng-ancestral-hall"]
   },
@@ -673,7 +700,7 @@ async function initializeData() {
     slug: "old-wharf", 
     name: "老码头", 
     zone: { name: "水岸区" },
-    map_position: { x: 75, y: 62 },   // 右下
+    map_position: { x: 68, y: 62 },
     tags: ["水岸风景", "民俗生活"],
     cover_image_url: placeImgUrls["old-wharf"]
   },
@@ -681,7 +708,7 @@ async function initializeData() {
     slug: "waterside-ancient-tree", 
     name: "水岸古树", 
     zone: { name: "水岸区" },
-    map_position: { x: 85, y: 80 },   // 右下角
+    map_position: { x: 79, y: 79 },
     tags: ["水岸风景", "亲子体验"],
     cover_image_url: placeImgUrls["waterside-ancient-tree"]
   }
@@ -704,83 +731,314 @@ function reportBehavior(promise) {
   promise.catch(error => console.warn('behavior record failed', error.message));
 }
 
+const westBankSlugs = new Set([
+  "village-history-museum",
+  "huang-ancestral-hall",
+  "poetry-lane",
+  "xiuxi-peng-ancestral-hall",
+]);
+const eastBankSlugs = new Set([
+  "bixi-scholar-hall",
+  "dong-ancestral-hall",
+  "old-wharf",
+  "waterside-ancient-tree",
+]);
+
+function bankOf(slug) {
+  if (westBankSlugs.has(slug)) return "west";
+  if (eastBankSlugs.has(slug)) return "east";
+  return slug === "ancient-bridge" ? "bridge" : "unknown";
+}
+
+function itineraryReference(route = state.route) {
+  return Number.isInteger(route?.id) ? { itinerary_id: route.id } : {};
+}
+
+function buildLocalRoute({
+  startSlug = "village-history-museum",
+  visitedSlugs = [],
+} = {}) {
+  const selectedInterests = Array.from(state.interests);
+  const visitedSet = new Set(visitedSlugs);
+
+  // 根据选择的兴趣筛选景点
+  let candidates = places.filter(place => {
+    if (visitedSet.has(place.slug) && place.slug !== startSlug) {
+      return false;
+    }
+
+    return (
+      Array.isArray(place.tags) &&
+      place.tags.some(tag => selectedInterests.includes(tag))
+    );
+  });
+
+  // 没有匹配到景点时，使用全部景点
+  if (!candidates.length) {
+    candidates = places.filter(place => {
+      return !visitedSet.has(place.slug) || place.slug === startSlug;
+    });
+  }
+
+  // 根据游览时间决定景点数量
+  const stopCount =
+    state.duration <= 30
+      ? 3
+      : state.duration <= 60
+        ? 4
+        : 5;
+
+  const byMapPosition = (a, b) => {
+    const ay = Number(a.map_position?.y ?? 0);
+    const by = Number(b.map_position?.y ?? 0);
+
+    if (Math.abs(ay - by) < 10) {
+      return (
+        Number(a.map_position?.x ?? 0) -
+        Number(b.map_position?.x ?? 0)
+      );
+    }
+
+    return ay - by;
+  };
+  candidates.sort(byMapPosition);
+
+  // 将起点放在第一个
+  const startPlace = places.find(place => place.slug === startSlug);
+
+  const startBank = bankOf(startSlug);
+  const remaining = candidates.filter(place => place.slug !== startSlug);
+  const sameBank = remaining.filter(place => bankOf(place.slug) === startBank);
+  const oppositeBank = remaining.filter(place => (
+    bankOf(place.slug) !== startBank && bankOf(place.slug) !== "bridge"
+  ));
+  const bridge = places.find(place => place.slug === "ancient-bridge");
+  const needsBridge = ["west", "east"].includes(startBank) && oppositeBank.length;
+  const westCandidates = remaining.filter(place => bankOf(place.slug) === "west");
+  const eastCandidates = remaining.filter(place => bankOf(place.slug) === "east");
+  const bridgeBank = westCandidates.length >= eastCandidates.length
+    ? westCandidates
+    : eastCandidates;
+  const orderedPlaces = startBank === "bridge"
+    ? [startPlace, ...bridgeBank].filter(Boolean)
+    : [
+        startPlace,
+        ...sameBank,
+        ...(needsBridge && bridge ? [bridge] : []),
+        ...oppositeBank,
+      ].filter(Boolean);
+
+  // 去重并截取需要的景点数量
+  const uniquePlaces = Array.from(
+    new Map(
+      orderedPlaces.map(place => [place.slug, place])
+    ).values()
+  ).slice(0, stopCount);
+
+  // 极端情况下确保至少有景点
+  const finalPlaces = uniquePlaces.length
+    ? uniquePlaces
+    : places.slice(0, stopCount);
+
+  const visitMinutes = Math.max(
+    12,
+    Math.floor(state.duration / Math.max(finalPlaces.length, 1))
+  );
+
+  const stops = finalPlaces.map((place, index) => ({
+    slug: place.slug,
+    name: place.name,
+    subtitle: place.subtitle || "",
+    zone: {
+      name: place.zone?.name || "碧江村",
+    },
+    visit_minutes: visitMinutes,
+    map_position: place.map_position || {
+      x: 18 + index * 15,
+      y: 18 + index * 14,
+    },
+    recommendation:
+      place.recommendation ||
+      `探索「${place.name}」，感受 ${
+        Array.isArray(place.tags) && place.tags.length
+          ? place.tags.join("、")
+          : "碧江古村文化"
+      }的独特魅力。`,
+  }));
+
+  // legs 的数量应比 stops 少一个
+  const legs = stops.slice(0, -1).map((stop, index) => ({
+    distance_meters: 160 + index * 35,
+    narrative_bridge:
+      index % 2 === 0
+        ? "沿碧水前行，不远处便是下一处风景。"
+        : "穿过古巷，下一段村落故事正在前方等待。",
+  }));
+
+  return {
+    id: `local-route-${Date.now()}`,
+    stops,
+    legs,
+    total_estimated_minutes: stops.reduce(
+      (total, stop) => total + stop.visit_minutes,
+      0
+    ),
+    score: 4.8,
+    mode: state.mode,
+    isLocalDemo: true,
+  };
+}
+
 async function createRoute() {
   if (state.generating) return;
+
+  if (!places.length) {
+    showToast("景点数据尚未加载，请稍后再试");
+    return;
+  }
+
   state.generating = true;
   transition(render);
+
+  const requestData = {
+    preference_tags: Array.from(state.interests),
+    duration_minutes: state.duration,
+    mode: state.mode,
+    start_attraction_slug: "village-history-museum",
+  };
+
   try {
-    state.route = await generateItinerary({
+    // 优先请求真实后台
+    state.route = await generateItinerary(requestData);
+
+    reportBehavior(
+      recordEvent("generate_route", {
+        ...itineraryReference(state.route),
+        metadata: {
+          preference_tags: requestData.preference_tags,
+          duration_minutes: requestData.duration_minutes,
+          mode: requestData.mode,
+          source: "api",
+        },
+      })
+    );
+  } catch (error) {
+    console.warn("API生成路线失败，改用本地演示路线：", error);
+
+    // 请求失败时生成本地路线，不再中断
+    state.route = buildLocalRoute({
+      startSlug: requestData.start_attraction_slug,
+    });
+
+    showToast("后台暂时无法连接，已生成本地演示路线");
+
+    reportBehavior(
+      recordEvent("generate_route", {
+        ...itineraryReference(state.route),
+        metadata: {
+          preference_tags: requestData.preference_tags,
+          duration_minutes: requestData.duration_minutes,
+          mode: requestData.mode,
+          source: "local_fallback",
+          api_error: error?.message || "请求失败",
+        },
+      })
+    );
+  } finally {
+    state.generating = false;
+  }
+
+  // 无论真实请求还是本地生成成功，都保存并跳转
+  if (state.route?.stops?.length) {
+    persistDemoState();
+    navigate("route");
+  } else {
+    showToast("暂时无法生成路线，请重新选择兴趣");
+    transition(render);
+  }
+}
+
+function requestRealLocation() {
+  if (!navigator.geolocation) {
+    state.locationStatus = "error";
+    state.locationMessage = "当前浏览器不支持定位";
+    transition(render);
+    return;
+  }
+  state.locationStatus = "loading";
+  state.locationMessage = "请在系统提示中允许定位";
+  transition(render);
+  navigator.geolocation.getCurrentPosition(
+    ({ coords }) => {
+      state.realLocation = {
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        accuracy: coords.accuracy,
+      };
+      state.locationStatus = "success";
+      state.locationMessage = "";
+      transition(render);
+    },
+    (error) => {
+      const messages = {
+        1: "你已拒绝定位权限，仍可使用模拟导览",
+        2: "暂时无法获取位置，请检查系统定位开关",
+        3: "定位请求超时，请稍后重试",
+      };
+      state.locationStatus = "error";
+      state.locationMessage = messages[error.code] || "定位失败，请稍后重试";
+      transition(render);
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+  );
+}
+
+async function confirmSimulatedArrival() {
+  const slug = state.pendingArrival;
+  if (!slug) return;
+  const isOffRoute = !state.route?.stops.some(stop => stop.slug === slug);
+  state.currentSimulatedSlug = slug;
+  state.visitedSlugs.add(slug);
+  state.pendingArrival = null;
+  persistDemoState();
+  transition(render);
+
+  let eventSynced = true;
+  try {
+    await recordEvent('simulated_arrival', {
+      attraction_slug: slug,
+      ...itineraryReference(),
+      metadata: { source: 'manual_map' },
+    });
+  } catch (error) {
+    eventSynced = false;
+    console.warn("模拟到达事件同步失败：", error);
+  }
+
+  if (isOffRoute) {
+    const requestData = {
       preference_tags: Array.from(state.interests),
       duration_minutes: state.duration,
       mode: state.mode,
-      start_attraction_slug: "village-history-museum",
-    });
-    reportBehavior(recordEvent('generate_route', {
-      itinerary_id: state.route.id,
-      metadata: {
-        preference_tags: Array.from(state.interests),
-        duration_minutes: state.duration,
-        mode: state.mode,
-      },
-    }));
-    navigate("route");
-  } catch (error) {
-    console.warn('API生成路线失败，使用模拟路线:', error.message);
-    const selectedInterests = Array.from(state.interests);
-    
-    // 1. 筛选景点
-    let filtered = places.filter(p => 
-      p.tags && p.tags.some(tag => selectedInterests.includes(tag))
-    );
-    if (filtered.length === 0) {
-      filtered = places.filter(p =>
-        selectedInterests.some(tag => p.name.includes(tag) || p.slug.includes(tag))
-      );
-    }
-    if (filtered.length === 0) {
-      filtered = places.slice(0, 5);
-    }
-    
-    // ===== 2. 按地图位置排序（从上到下，从左到右），形成自然路径 =====
-    filtered.sort((a, b) => {
-      // 先按 y 坐标（从上到下），再按 x 坐标（从左到右）
-      const aY = a.map_position?.y ?? 0;
-      const bY = b.map_position?.y ?? 0;
-      if (Math.abs(aY - bY) < 10) {
-        return (a.map_position?.x ?? 0) - (b.map_position?.x ?? 0);
-      }
-      return aY - bY;
-    });
-    
-    // 3. 生成 stops（使用景点自带的坐标）
-    const stops = filtered.map((p, idx) => ({
-      slug: p.slug,
-      name: p.name,
-      zone: { name: p.zone?.name || '碧江' },
-      visit_minutes: 20 + Math.floor(Math.random() * 10),
-      map_position: p.map_position || { x: 15 + idx * 12, y: 25 + idx * 6 }, // 如果没有坐标则使用备用
-      recommendation: `探索「${p.name}」，感受 ${p.tags ? p.tags.join('、') : '碧江'} 的独特魅力。`
-    }));
-    
-    // 4. 生成 legs
-    const legs = stops.slice(1).map((_, idx) => ({
-      distance_meters: 150 + Math.floor(Math.random() * 100),
-      narrative_bridge: `沿碧水前行，不远处便是下一处风景。`
-    }));
-    
-    const route = {
-      stops: stops,
-      legs: legs,
-      total_estimated_minutes: stops.reduce((sum, s) => sum + s.visit_minutes, 0),
-      score: 4.5 + Math.random() * 0.5,
-      mode: state.mode,
+      start_attraction_slug: slug,
+      visited_attraction_slugs: Array.from(state.visitedSlugs),
     };
-    
-    state.route = route;
-    navigate("route");
-  } finally {
-    state.generating = false;
-    if (!destroyed && state.view === "interests") transition(render);
+
+    try {
+      state.route = await generateItinerary(requestData);
+      showToast(eventSynced ? "已从当前位置重新规划路线" : "已重新规划，足迹稍后同步");
+    } catch (error) {
+      console.warn("后台重新规划失败，使用本地路线：", error);
+      state.route = buildLocalRoute({
+        startSlug: slug,
+        visitedSlugs: Array.from(state.visitedSlugs),
+      });
+      showToast("后台暂时无法连接，已在本地重新规划");
+    }
+    persistDemoState();
+    transition(render);
+  } else {
+    showToast(eventSynced ? "已记录模拟到达" : "位置已保留，足迹稍后同步");
   }
 }
 
@@ -794,7 +1052,7 @@ async function openAttraction(slug) {
     state.attractionDetail = await getAttraction(slug);
     reportBehavior(recordEvent('view_attraction', {
       attraction_slug: slug,
-      itinerary_id: state.route?.id,
+      ...itineraryReference(),
     }));
   } catch (error) {
     showToast(`故事加载失败：${error.message}`);
@@ -809,14 +1067,22 @@ const handleClick = (event) => {
   if (route) { event.preventDefault(); navigate(route.dataset.route); return; }
   const button = event.target.closest("button");
   if (!button) return;
+  if (button.dataset.mapSlug) {
+    state.pendingArrival = button.dataset.mapSlug;
+    transition(render);
+    return;
+  }
   if (button.dataset.attractionSlug) { void openAttraction(button.dataset.attractionSlug); return; }
   if (button.dataset.interest) {
     state.interests.has(button.dataset.interest) ? state.interests.delete(button.dataset.interest) : state.interests.add(button.dataset.interest);
-    transition(render); return;
+    persistDemoState(); transition(render); return;
   }
-  if (button.dataset.duration) { state.duration = Number(button.dataset.duration); transition(render); return; }
-  if (button.dataset.mode) { state.mode = button.dataset.mode; transition(render); return; }
+  if (button.dataset.duration) { state.duration = Number(button.dataset.duration); persistDemoState(); transition(render); return; }
+  if (button.dataset.mode) { state.mode = button.dataset.mode; persistDemoState(); transition(render); return; }
   if (button.dataset.action === "generate-route") { void createRoute(); return; }
+  if (button.dataset.action === "request-location") { requestRealLocation(); return; }
+  if (button.dataset.action === "cancel-arrival") { state.pendingArrival = null; transition(render); return; }
+  if (button.dataset.action === "confirm-arrival") { void confirmSimulatedArrival(); return; }
   if (button.dataset.action === "favorite-current") {
     const slug = state.attractionDetail?.slug || state.selectedAttraction;
     if (slug) {
@@ -832,7 +1098,7 @@ const handleClick = (event) => {
     if (state.audioPlaying) {
       reportBehavior(recordEvent('audio_play', {
         attraction_slug: state.selectedAttraction || 'huang-ancestral-hall',
-        itinerary_id: state.route?.id,
+        ...itineraryReference(),
         metadata: { progress: state.audioProgress },
       }));
     }
@@ -847,7 +1113,7 @@ const handleClick = (event) => {
   }
   if (button.dataset.action === "stamp") {
     const place = places[Number(button.dataset.index)];
-    if (place?.slug && state.route?.id) {
+    if (place?.slug && Number.isInteger(state.route?.id)) {
       reportBehavior(recordFootprint({
         itinerary_id: state.route.id,
         attraction_slug: place.slug,

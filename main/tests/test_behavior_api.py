@@ -75,6 +75,30 @@ class BehaviorApiTests(TestCase):
         self.assertEqual(str(favorite.session_id), session_id)
         self.assertEqual(favorite.attraction.slug, "village-history-museum")
 
+    def test_records_simulated_arrival_with_itinerary(self):
+        session_id = self.create_session()
+        itinerary_id = self.create_itinerary(session_id)
+
+        response = self.client.post(
+            "/api/v1/events/",
+            data=json.dumps(
+                {
+                    "event_type": "simulated_arrival",
+                    "attraction_slug": "village-history-museum",
+                    "itinerary_id": itinerary_id,
+                    "metadata": {"source": "manual_map"},
+                }
+            ),
+            content_type="application/json",
+            HTTP_X_VISITOR_SESSION_ID=session_id,
+        )
+
+        self.assertEqual(response.status_code, 201)
+        event = VisitorEvent.objects.get(event_type="simulated_arrival")
+        self.assertEqual(event.itinerary_id, itinerary_id)
+        self.assertEqual(event.attraction.slug, "village-history-museum")
+        self.assertEqual(event.metadata, {"source": "manual_map"})
+
     def test_records_footprint_with_route_and_default_touchpoint(self):
         session_id = self.create_session()
         itinerary_id = self.create_itinerary(session_id)

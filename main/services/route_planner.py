@@ -164,7 +164,9 @@ def generate_route(
     duration_minutes,
     mode,
     start_attraction_slug="village-history-museum",
+    visited_attraction_slugs=None,
 ):
+    visited_attraction_slugs = set(visited_attraction_slugs or ())
     attractions = list(
         Attraction.objects.filter(status=Attraction.Status.ENABLED)
         .select_related("zone")
@@ -176,6 +178,10 @@ def generate_route(
         start = next(item for item in attractions if item.slug == start_attraction_slug)
     except StopIteration as exc:
         raise NoRouteError("起点不存在或未启用。") from exc
+
+    excluded_slugs = visited_attraction_slugs - {start_attraction_slug}
+    attractions = [item for item in attractions if item.slug not in excluded_slugs]
+    attractions_by_id = {item.id: item for item in attractions}
 
     paths = {
         (item.from_attraction_id, item.to_attraction_id): item

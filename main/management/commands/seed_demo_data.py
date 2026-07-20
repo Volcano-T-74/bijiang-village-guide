@@ -86,11 +86,43 @@ class Command(BaseCommand):
                     attraction=attraction, theme=themes[theme_name]
                 )
 
-        scenic_slugs = {"ancient-bridge", "old-wharf", "waterside-ancient-tree"}
-        for first in attractions:
-            for second in attractions:
-                if first.pk == second.pk:
-                    continue
+        west_slugs = {
+            "village-history-museum",
+            "huang-ancestral-hall",
+            "poetry-lane",
+            "xiuxi-peng-ancestral-hall",
+        }
+        east_slugs = {
+            "bixi-scholar-hall",
+            "dong-ancestral-hall",
+            "old-wharf",
+            "waterside-ancient-tree",
+        }
+        bridge_slug = "ancient-bridge"
+        allowed_pairs = {
+            (first.slug, second.slug)
+            for bank in (west_slugs, east_slugs)
+            for first in attractions
+            for second in attractions
+            if first.slug in bank and second.slug in bank and first.pk != second.pk
+        }
+        allowed_pairs.update(
+            {
+                pair
+                for slug in west_slugs | east_slugs
+                for pair in ((slug, bridge_slug), (bridge_slug, slug))
+            }
+        )
+        attractions_by_slug = {item.slug: item for item in attractions}
+        AttractionPath.objects.filter(
+            from_attraction__in=attractions,
+            to_attraction__in=attractions,
+        ).delete()
+
+        scenic_slugs = {bridge_slug, "old-wharf", "waterside-ancient-tree"}
+        for first_slug, second_slug in sorted(allowed_pairs):
+                first = attractions_by_slug[first_slug]
+                second = attractions_by_slug[second_slug]
                 distance = demo_distance(first, second)
                 AttractionPath.objects.update_or_create(
                     from_attraction=first,
@@ -106,6 +138,6 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                "Demo data ready: 4 zones, 9 attractions, 6 themes, 9 stories, 72 paths."
+                "Demo data ready: 4 zones, 9 attractions, 6 themes, 9 stories, 40 paths."
             )
         )

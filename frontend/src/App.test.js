@@ -63,6 +63,7 @@ describe('Bijiang village website', () => {
         if (url === '/api/v1/sessions/') return jsonResponse({ id: 'session-1' }, 201)
         if (url === '/api/v1/bootstrap/') return jsonResponse(bootstrap)
         if (url === '/api/v1/itineraries/generate/') return jsonResponse(route, 201)
+        if (url === '/api/v1/events/') return jsonResponse({ id: 1 }, 201)
         if (url === '/api/v1/attractions/village-history-museum/') {
           return jsonResponse({
             ...bootstrap.attractions[0],
@@ -107,5 +108,207 @@ describe('Bijiang village website', () => {
       '/api/v1/sessions/',
       expect.anything(),
     )
+  })
+
+  it('requests location on demand and never uploads the coordinates', async () => {
+    const getCurrentPosition = vi.fn((success) => success({
+      coords: { latitude: 23.1234567, longitude: 113.7654321, accuracy: 18.4 },
+    }))
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } })
+    const wrapper = mount(App, { attachTo: document.body })
+    await flushPromises()
+    await wrapper.get('[data-route="interests"]').trigger('click')
+    await wrapper.get('[data-action="generate-route"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.get('[data-action="request-location"]').trigger('click')
+    await flushPromises()
+
+    expect(getCurrentPosition).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.any(Function),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    )
+    expect(wrapper.text()).toContain('23.123457')
+    expect(wrapper.text()).toContain('113.765432')
+    for (const call of fetch.mock.calls) {
+      expect(call[1]?.body || '').not.toContain('23.1234567')
+      expect(call[1]?.body || '').not.toContain('113.7654321')
+    }
+  })
+
+  it('requires confirmation before recording a simulated arrival', async () => {
+    const wrapper = mount(App, { attachTo: document.body })
+    await flushPromises()
+    await wrapper.get('[data-route="interests"]').trigger('click')
+    await wrapper.get('[data-action="generate-route"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.get('[data-map-slug="village-history-museum"]').trigger('click')
+    expect(fetch).not.toHaveBeenCalledWith(
+      '/api/v1/events/',
+      expect.objectContaining({ body: expect.stringContaining('simulated_arrival') }),
+    )
+
+    await wrapper.get('[data-action="confirm-arrival"]').trigger('click')
+    await flushPromises()
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/v1/events/',
+      expect.objectContaining({
+        body: expect.stringContaining('simulated_arrival'),
+      }),
+    )
+    expect(localStorage.getItem('bijiang_indoor_demo_state')).toContain(
+      'village-history-museum',
+    )
+  })
+
+  it('keeps the simulated map available when location permission is denied', async () => {
+    const getCurrentPosition = vi.fn((_, failure) => failure({ code: 1 }))
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } })
+    const wrapper = mount(App, { attachTo: document.body })
+    await flushPromises()
+    await wrapper.get('[data-route="interests"]').trigger('click')
+    await wrapper.get('[data-action="generate-route"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.get('[data-action="request-location"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('你已拒绝定位权限')
+    expect(wrapper.find('[data-map-slug="village-history-museum"]').exists()).toBe(true)
+  })
+
+  it('restores the simulated location and route after a refresh', async () => {
+    localStorage.setItem('bijiang_indoor_demo_state', JSON.stringify({
+      interests: ['岭南建筑'],
+      duration: 60,
+      mode: 'relaxed',
+      route,
+      currentSimulatedSlug: 'village-history-museum',
+      visitedSlugs: ['village-history-museum'],
+    }))
+    history.replaceState({}, '', '/#route')
+
+    const wrapper = mount(App, { attachTo: document.body })
+    await flushPromises()
+
+    expect(wrapper.find('[data-map-slug="village-history-museum"].is-current').exists()).toBe(true)
+    expect(wrapper.find('[data-map-slug="village-history-museum"].is-visited').exists()).toBe(true)
+  })
+
+  it('keeps the ancient bridge between river banks in the local fallback route', async () => {
+    const originalAttractions = bootstrap.attractions
+    bootstrap.attractions = [
+      originalAttractions[0],
+      {
+        ...originalAttractions[0],
+        id: 2,
+        name: '碧溪书公祠',
+        slug: 'bixi-scholar-hall',
+        map_position: { x: 69, y: 17 },
+      },
+      {
+        ...originalAttractions[0],
+        id: 3,
+        name: '古桥',
+        slug: 'ancient-bridge',
+        map_position: { x: 50, y: 45 },
+      },
+    ]
+    fetch.mockImplementation((url) => {
+      if (url === '/api/v1/sessions/') return jsonResponse({ id: 'session-1' }, 201)
+      if (url === '/api/v1/bootstrap/') return jsonResponse(bootstrap)
+      if (url === '/api/v1/itineraries/generate/') return jsonResponse({ detail: 'offline' }, 503)
+      if (url === '/api/v1/events/') return jsonResponse({ id: 1 }, 201)
+      return jsonResponse({ detail: 'not found' }, 404)
+    })
+
+    const wrapper = mount(App, { attachTo: document.body })
+    await flushPromises()
+    await wrapper.get('[data-route="interests"]').trigger('click')
+    await wrapper.get('[data-action="generate-route"]').trigger('click')
+    await flushPromises()
+
+    const stopNames = wrapper.findAll('.route-stop strong').map(item => item.text())
+    expect(stopNames.indexOf('古桥')).toBeLessThan(stopNames.indexOf('碧溪书公祠'))
+    const eventBodies = fetch.mock.calls
+      .filter(([url]) => url === '/api/v1/events/')
+      .map(([, options]) => options.body)
+    expect(eventBodies.join('')).not.toContain('local-route-')
+    bootstrap.attractions = originalAttractions
+  })
+
+  it('replans an off-route arrival even when event recording fails', async () => {
+    const eastPlace = {
+      ...bootstrap.attractions[0],
+      id: 2,
+      name: '碧溪书公祠',
+      slug: 'bixi-scholar-hall',
+      map_position: { x: 69, y: 17 },
+    }
+    const demoBootstrap = { ...bootstrap, attractions: [bootstrap.attractions[0], eastPlace] }
+    let itineraryCalls = 0
+    fetch.mockImplementation((url) => {
+      if (url === '/api/v1/sessions/') return jsonResponse({ id: 'session-1' }, 201)
+      if (url === '/api/v1/bootstrap/') return jsonResponse(demoBootstrap)
+      if (url === '/api/v1/itineraries/generate/') {
+        itineraryCalls += 1
+        return jsonResponse(itineraryCalls === 1 ? route : {
+          ...route,
+          id: 2,
+          stops: [{ ...route.stops[0], ...eastPlace }],
+        }, 201)
+      }
+      if (url === '/api/v1/events/') return jsonResponse({ detail: 'offline' }, 503)
+      return jsonResponse({ detail: 'not found' }, 404)
+    })
+
+    const wrapper = mount(App, { attachTo: document.body })
+    await flushPromises()
+    await wrapper.get('[data-route="interests"]').trigger('click')
+    await wrapper.get('[data-action="generate-route"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-map-slug="bixi-scholar-hall"]').trigger('click')
+    await wrapper.get('[data-action="confirm-arrival"]').trigger('click')
+    await flushPromises()
+
+    expect(itineraryCalls).toBe(2)
+    expect(wrapper.findAll('.route-stop strong').map(item => item.text())).toContain('碧溪书公祠')
+  })
+
+  it('does not cross from one bank to the other in a bridge-start local fallback', async () => {
+    const demoBootstrap = {
+      ...bootstrap,
+      attractions: [
+        bootstrap.attractions[0],
+        { ...bootstrap.attractions[0], id: 2, name: '碧溪书公祠', slug: 'bixi-scholar-hall', map_position: { x: 69, y: 17 } },
+        { ...bootstrap.attractions[0], id: 3, name: '古桥', slug: 'ancient-bridge', map_position: { x: 50, y: 45 } },
+      ],
+    }
+    let itineraryCalls = 0
+    fetch.mockImplementation((url) => {
+      if (url === '/api/v1/sessions/') return jsonResponse({ id: 'session-1' }, 201)
+      if (url === '/api/v1/bootstrap/') return jsonResponse(demoBootstrap)
+      if (url === '/api/v1/itineraries/generate/') {
+        itineraryCalls += 1
+        return itineraryCalls === 1 ? jsonResponse(route, 201) : jsonResponse({ detail: 'offline' }, 503)
+      }
+      if (url === '/api/v1/events/') return jsonResponse({ id: 1 }, 201)
+      return jsonResponse({ detail: 'not found' }, 404)
+    })
+
+    const wrapper = mount(App, { attachTo: document.body })
+    await flushPromises()
+    await wrapper.get('[data-route="interests"]').trigger('click')
+    await wrapper.get('[data-action="generate-route"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-map-slug="ancient-bridge"]').trigger('click')
+    await wrapper.get('[data-action="confirm-arrival"]').trigger('click')
+    await flushPromises()
+
+    const stopNames = wrapper.findAll('.route-stop strong').map(item => item.text())
+    expect(stopNames).toContain('古桥')
+    expect(stopNames).not.toEqual(expect.arrayContaining(['村史馆', '碧溪书公祠']))
   })
 })

@@ -19,6 +19,11 @@ class SameOriginFrontendTests(SimpleTestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse("admin:login"), response.url)
 
+    def test_responses_allow_frames_only_from_the_same_origin(self):
+        response = self.client.get("/")
+
+        self.assertEqual(response.headers["X-Frame-Options"], "SAMEORIGIN")
+
     def test_django_reads_the_vite_build_as_template_and_static_source(self):
         build_dir = settings.BASE_DIR / "frontend" / "dist"
         template_dirs = {Path(path) for path in settings.TEMPLATES[0]["DIRS"]}

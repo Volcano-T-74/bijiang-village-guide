@@ -56,3 +56,41 @@ class RoutePlannerTests(TestCase):
         AttractionPath.objects.all().delete()
         with self.assertRaises(NoRouteError):
             generate_route(["岭南建筑"], 60, "relaxed")
+
+    def test_cross_river_route_uses_ancient_bridge(self):
+        from main.services.route_planner import generate_route
+
+        route = generate_route(
+            [],
+            90,
+            "relaxed",
+            start_attraction_slug="village-history-museum",
+            visited_attraction_slugs={
+                "huang-ancestral-hall",
+                "poetry-lane",
+                "xiuxi-peng-ancestral-hall",
+            },
+        )
+        slugs = [stop["slug"] for stop in route["stops"]]
+        east = {
+            "bixi-scholar-hall",
+            "dong-ancestral-hall",
+            "old-wharf",
+            "waterside-ancient-tree",
+        }
+        self.assertTrue(east.intersection(slugs))
+        self.assertIn("ancient-bridge", slugs)
+
+    def test_visited_attractions_are_excluded_except_current_start(self):
+        from main.services.route_planner import generate_route
+
+        route = generate_route(
+            [],
+            90,
+            "relaxed",
+            start_attraction_slug="huang-ancestral-hall",
+            visited_attraction_slugs={"village-history-museum", "huang-ancestral-hall"},
+        )
+        slugs = [stop["slug"] for stop in route["stops"]]
+        self.assertEqual(slugs[0], "huang-ancestral-hall")
+        self.assertNotIn("village-history-museum", slugs)

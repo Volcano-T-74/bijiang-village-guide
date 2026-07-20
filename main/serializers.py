@@ -25,6 +25,9 @@ class ItineraryGenerateSerializer(serializers.Serializer):
     start_attraction_slug = serializers.SlugField(
         required=False, default="village-history-museum"
     )
+    visited_attraction_slugs = serializers.ListField(
+        child=serializers.SlugField(), required=False, default=list
+    )
 
     def validate_preference_tags(self, value):
         valid = set(Theme.objects.filter(name__in=value).values_list("name", flat=True))
@@ -40,6 +43,20 @@ class ItineraryGenerateSerializer(serializers.Serializer):
         if not exists:
             raise serializers.ValidationError("起点不存在或未启用。")
         return value
+
+    def validate_visited_attraction_slugs(self, value):
+        unique = list(dict.fromkeys(value))
+        valid = set(
+            Attraction.objects.filter(
+                slug__in=unique, status=Attraction.Status.ENABLED
+            ).values_list("slug", flat=True)
+        )
+        invalid = sorted(set(unique) - valid)
+        if invalid:
+            raise serializers.ValidationError(
+                f"景点不存在或未启用：{'、'.join(invalid)}"
+            )
+        return unique
 
 
 class AttractionSlugSerializer(serializers.Serializer):

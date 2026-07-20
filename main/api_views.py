@@ -209,6 +209,7 @@ class ItineraryGenerateView(APIView):
                 values["duration_minutes"],
                 values["mode"],
                 values["start_attraction_slug"],
+                values["visited_attraction_slugs"],
             )
         except NoRouteError as exc:
             return Response(

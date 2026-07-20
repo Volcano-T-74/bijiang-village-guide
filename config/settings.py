@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -65,7 +66,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "config.middleware.SameOriginFrameMiddleware",
 ]
 
 if not DEBUG:
@@ -93,6 +94,9 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+
+if not DEBUG and not os.environ.get("DATABASE_URL"):
+    raise ImproperlyConfigured("DATABASE_URL is required when DEBUG=False.")
 
 DATABASES = {
     "default": dj_database_url.config(
@@ -149,6 +153,18 @@ if not DEBUG:
             "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
         },
     }
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "3600"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+
+# SimpleUI removes Django's built-in frame middleware at startup. The custom
+# equivalent above preserves SAMEORIGIN, while HSTS preload stays off until the
+# new domain has operated exclusively over HTTPS for a sustained period.
+SILENCED_SYSTEM_CHECKS = ["security.W002", "security.W021"]
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [],

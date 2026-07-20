@@ -4,7 +4,7 @@ set -o errexit
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 
-npm install --prefix frontend
-npm run build --prefix frontend
+corepack pnpm --dir frontend install --frozen-lockfile
+corepack pnpm --dir frontend build
 
 python manage.py collectstatic --noinput

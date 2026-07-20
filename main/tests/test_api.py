@@ -27,7 +27,7 @@ class TourismApiTests(TestCase):
         self.assertEqual(len(payload["themes"]), 6)
         self.assertEqual(len(payload["attractions"]), 9)
         self.assertEqual(payload["attractions"][0]["slug"], "village-history-museum")
-        self.assertEqual(payload["attractions"][0]["map_position"], {"x": 40.0, "y": 10.0})
+        self.assertEqual(payload["attractions"][0]["map_position"], {"x": 42.0, "y": 13.0})
 
     def test_attraction_detail_returns_latest_story(self):
         response = self.client.get(
@@ -119,3 +119,44 @@ class TourismApiTests(TestCase):
             HTTP_X_VISITOR_SESSION_ID=session_id,
         )
         self.assertEqual(no_route.status_code, 422)
+
+    def test_replanning_excludes_visited_attractions(self):
+        session_id = self.create_session()
+        response = self.client.post(
+            "/api/v1/itineraries/generate/",
+            data=json.dumps(
+                {
+                    "preference_tags": [],
+                    "duration_minutes": 90,
+                    "mode": "relaxed",
+                    "start_attraction_slug": "huang-ancestral-hall",
+                    "visited_attraction_slugs": [
+                        "village-history-museum",
+                        "huang-ancestral-hall",
+                    ],
+                }
+            ),
+            content_type="application/json",
+            HTTP_X_VISITOR_SESSION_ID=session_id,
+        )
+        self.assertEqual(response.status_code, 201)
+        slugs = [stop["slug"] for stop in response.json()["stops"]]
+        self.assertEqual(slugs[0], "huang-ancestral-hall")
+        self.assertNotIn("village-history-museum", slugs)
+
+    def test_replanning_rejects_unknown_visited_attraction(self):
+        session_id = self.create_session()
+        response = self.client.post(
+            "/api/v1/itineraries/generate/",
+            data=json.dumps(
+                {
+                    "preference_tags": [],
+                    "duration_minutes": 60,
+                    "mode": "relaxed",
+                    "visited_attraction_slugs": ["not-a-real-attraction"],
+                }
+            ),
+            content_type="application/json",
+            HTTP_X_VISITOR_SESSION_ID=session_id,
+        )
+        self.assertEqual(response.status_code, 400)
