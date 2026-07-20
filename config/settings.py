@@ -198,9 +198,10 @@ SIMPLEUI_CONFIG = {
             "url": "/admin/data-overview/",
         },
         {
-            "name": "AI 运营分析",
-            "icon": "fas fa-comments",
+            "name": "AI 助手",
+            "icon": "fas fa-robot",
             "url": "/admin/ai-analytics/",
+            "newTab": False,
         },
         {
             "name": "内容资产库",

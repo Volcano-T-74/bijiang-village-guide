@@ -19,7 +19,11 @@
 
   const errorMessages = {
     configuration: "DeepSeek 服务尚未配置，请检查 Render 环境变量。",
+    authentication: "DeepSeek 密钥无效或没有访问权限，请在 Render 中更换密钥。",
+    balance: "DeepSeek 账户余额不足，请充值后重试。",
+    rate_limit: "DeepSeek 请求过于频繁，请稍后重试。",
     timeout: "DeepSeek 响应超时，可以稍后重试。",
+    network: "Render 无法连接 DeepSeek，请检查网络后重试。",
     upstream: "DeepSeek 服务暂时不可用，可以稍后重试。",
     response: "DeepSeek 返回内容无法解析，可以重新提问。",
   };

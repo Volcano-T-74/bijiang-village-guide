@@ -13,6 +13,10 @@ from main.services.analytics_conversation import (
 ERROR_HTTP_STATUSES = {
     "configuration": 503,
     "timeout": 504,
+    "authentication": 502,
+    "balance": 402,
+    "rate_limit": 429,
+    "network": 502,
     "upstream": 502,
     "response": 502,
 }
@@ -68,7 +72,7 @@ def ai_analytics_page(request):
         request,
         "admin/ai_analytics.html",
         {
-            "title": "AI 运营分析",
+            "title": "AI 助手",
             "conversations": conversations,
         },
     )

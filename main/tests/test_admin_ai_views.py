@@ -123,18 +123,28 @@ class AdminAiViewsTests(TestCase):
             question="问题",
             days=30,
             status=AnalyticsTurn.Status.FAILED,
-            error_code="timeout",
         )
-        ask.return_value = turn
         self.client.force_login(self.staff)
-
-        response = self.client.post(
-            f"/admin/ai-analytics/conversations/{self.conversation.pk}/ask/",
-            {"question": "问题", "days": 30},
-        )
-        self.assertEqual(response.status_code, 504)
-        self.assertEqual(response.json()["error"], "timeout")
-        self.assertNotIn("exception", response.content.decode().lower())
+        cases = {
+            "timeout": 504,
+            "authentication": 502,
+            "balance": 402,
+            "rate_limit": 429,
+            "network": 502,
+            "upstream": 502,
+        }
+        for error_code, expected_status in cases.items():
+            with self.subTest(error_code=error_code):
+                turn.error_code = error_code
+                turn.save(update_fields=("error_code",))
+                ask.return_value = turn
+                response = self.client.post(
+                    f"/admin/ai-analytics/conversations/{self.conversation.pk}/ask/",
+                    {"question": "问题", "days": 30},
+                )
+                self.assertEqual(response.status_code, expected_status)
+                self.assertEqual(response.json()["error"], error_code)
+                self.assertNotIn("exception", response.content.decode().lower())
 
     @patch("main.admin_ai_views.retry_analytics_turn")
     def test_retry_enforces_turn_ownership(self, retry):
