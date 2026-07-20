@@ -1,0 +1,12 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<h1>AI 运营分析</h1>
+<ul>
+  {% for conversation in conversations %}
+    <li>{{ conversation.title }}</li>
+  {% empty %}
+    <li>暂无对话</li>
+  {% endfor %}
+</ul>
+{% endblock %}

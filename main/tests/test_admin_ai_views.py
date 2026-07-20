@@ -1,0 +1,135 @@
+from unittest.mock import patch
+
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from django.urls import reverse
+
+from main.models import AnalyticsConversation, AnalyticsTurn
+
+
+ANALYSIS = {
+    "summary": "村史馆最受欢迎",
+    "popular_attractions": [],
+    "business_recommendations": [],
+    "evidence": ["模拟到达次数最多"],
+    "limitations": ["样本量较少"],
+}
+
+
+class AdminAiViewsTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.staff = User.objects.create_user(username="staff-one", is_staff=True)
+        self.other_staff = User.objects.create_user(username="staff-two", is_staff=True)
+        self.ordinary = User.objects.create_user(username="ordinary")
+        self.conversation = AnalyticsConversation.objects.create(
+            owner=self.staff, title="我的运营分析", default_days=30
+        )
+        self.other_conversation = AnalyticsConversation.objects.create(
+            owner=self.other_staff, title="其他人的分析", default_days=30
+        )
+
+    def test_page_requires_staff_and_lists_only_owned_conversations(self):
+        response = self.client.get("/admin/ai-analytics/")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("admin:login"), response.url)
+
+        self.client.force_login(self.ordinary)
+        self.assertEqual(self.client.get("/admin/ai-analytics/").status_code, 302)
+
+        self.client.force_login(self.staff)
+        response = self.client.get("/admin/ai-analytics/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "我的运营分析")
+        self.assertNotContains(response, "其他人的分析")
+
+    def test_conversation_detail_enforces_ownership(self):
+        self.client.force_login(self.staff)
+        own = self.client.get(
+            f"/admin/ai-analytics/conversations/{self.conversation.pk}/"
+        )
+        other = self.client.get(
+            f"/admin/ai-analytics/conversations/{self.other_conversation.pk}/"
+        )
+        self.assertEqual(own.status_code, 200)
+        self.assertEqual(own.json()["data"]["title"], "我的运营分析")
+        self.assertEqual(other.status_code, 404)
+
+    def test_creates_conversation_and_validates_days(self):
+        self.client.force_login(self.staff)
+        created = self.client.post(
+            "/admin/ai-analytics/conversations/", {"default_days": 7}
+        )
+        invalid = self.client.post(
+            "/admin/ai-analytics/conversations/", {"default_days": 8}
+        )
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(created.json()["data"]["default_days"], 7)
+        self.assertEqual(invalid.status_code, 400)
+
+    @patch("main.admin_ai_views.ask_analytics_question")
+    def test_asks_question_and_serializes_completed_turn(self, ask):
+        turn = AnalyticsTurn.objects.create(
+            conversation=self.conversation,
+            question="哪个景点最热门？",
+            answer=ANALYSIS,
+            days=30,
+            status=AnalyticsTurn.Status.COMPLETED,
+        )
+        ask.return_value = turn
+        self.client.force_login(self.staff)
+
+        response = self.client.post(
+            f"/admin/ai-analytics/conversations/{self.conversation.pk}/ask/",
+            {"question": "哪个景点最热门？", "days": 30},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["data"]["answer"], ANALYSIS)
+        ask.assert_called_once_with(self.conversation, "哪个景点最热门？", 30)
+
+    @patch("main.admin_ai_views.ask_analytics_question")
+    def test_rejects_invalid_question_without_calling_service(self, ask):
+        self.client.force_login(self.staff)
+        response = self.client.post(
+            f"/admin/ai-analytics/conversations/{self.conversation.pk}/ask/",
+            {"question": "", "days": 30},
+        )
+        self.assertEqual(response.status_code, 400)
+        ask.assert_not_called()
+
+    @patch("main.admin_ai_views.ask_analytics_question")
+    def test_failed_turn_returns_safe_status(self, ask):
+        turn = AnalyticsTurn.objects.create(
+            conversation=self.conversation,
+            question="问题",
+            days=30,
+            status=AnalyticsTurn.Status.FAILED,
+            error_code="timeout",
+        )
+        ask.return_value = turn
+        self.client.force_login(self.staff)
+
+        response = self.client.post(
+            f"/admin/ai-analytics/conversations/{self.conversation.pk}/ask/",
+            {"question": "问题", "days": 30},
+        )
+        self.assertEqual(response.status_code, 504)
+        self.assertEqual(response.json()["error"], "timeout")
+        self.assertNotIn("exception", response.content.decode().lower())
+
+    @patch("main.admin_ai_views.retry_analytics_turn")
+    def test_retry_enforces_turn_ownership(self, retry):
+        other_turn = AnalyticsTurn.objects.create(
+            conversation=self.other_conversation,
+            question="其他人的问题",
+            days=30,
+            status=AnalyticsTurn.Status.FAILED,
+        )
+        self.client.force_login(self.staff)
+
+        response = self.client.post(
+            f"/admin/ai-analytics/turns/{other_turn.pk}/retry/"
+        )
+        self.assertEqual(response.status_code, 404)
+        retry.assert_not_called()

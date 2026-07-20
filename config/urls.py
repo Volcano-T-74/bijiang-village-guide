@@ -19,8 +19,40 @@ from django.urls import include, path
 from django.views.generic import TemplateView
 
 from main.admin import data_overview
+from main.admin_ai_views import (
+    ai_analytics_page,
+    ask_conversation,
+    conversation_detail,
+    create_conversation,
+    retry_turn,
+)
 
 urlpatterns = [
+    path(
+        "admin/ai-analytics/",
+        admin.site.admin_view(ai_analytics_page),
+        name="admin_ai_analytics",
+    ),
+    path(
+        "admin/ai-analytics/conversations/",
+        admin.site.admin_view(create_conversation),
+        name="admin_ai_conversation_create",
+    ),
+    path(
+        "admin/ai-analytics/conversations/<int:conversation_id>/",
+        admin.site.admin_view(conversation_detail),
+        name="admin_ai_conversation_detail",
+    ),
+    path(
+        "admin/ai-analytics/conversations/<int:conversation_id>/ask/",
+        admin.site.admin_view(ask_conversation),
+        name="admin_ai_conversation_ask",
+    ),
+    path(
+        "admin/ai-analytics/turns/<int:turn_id>/retry/",
+        admin.site.admin_view(retry_turn),
+        name="admin_ai_turn_retry",
+    ),
     path(
         "admin/data-overview/",
         admin.site.admin_view(data_overview),
