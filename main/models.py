@@ -1,5 +1,6 @@
 import uuid
 
+from django.conf import settings
 from django.db import models
 
 
@@ -502,3 +503,85 @@ class Favorite(models.Model):
 
     def __str__(self):
         return f"{self.session} - {self.attraction}"
+
+
+class AnalyticsConversation(models.Model):
+    id = models.BigAutoField("ID", primary_key=True)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="后台员工",
+        on_delete=models.CASCADE,
+        related_name="analytics_conversations",
+    )
+    title = models.CharField("会话标题", max_length=120)
+    default_days = models.PositiveSmallIntegerField("默认统计天数", default=30)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+    updated_at = models.DateTimeField("更新时间", auto_now=True)
+
+    class Meta:
+        db_table = "analytics_conversations"
+        ordering = ("-updated_at", "-id")
+        verbose_name = "AI 运营分析会话"
+        verbose_name_plural = "AI 运营分析会话"
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(default_days__in=(7, 30, 90)),
+                name="analytics_conversation_days_valid",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=("owner", "-updated_at"),
+                name="analytics_owner_updated_idx",
+            )
+        ]
+
+    def __str__(self):
+        return self.title
+
+
+class AnalyticsTurn(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "处理中"
+        COMPLETED = "completed", "已完成"
+        FAILED = "failed", "失败"
+
+    id = models.BigAutoField("ID", primary_key=True)
+    conversation = models.ForeignKey(
+        AnalyticsConversation,
+        verbose_name="所属会话",
+        on_delete=models.CASCADE,
+        related_name="turns",
+    )
+    question = models.TextField("管理员问题")
+    answer = models.JSONField("AI 结构化回答", default=dict, blank=True)
+    metrics_snapshot = models.JSONField("匿名指标快照", default=dict, blank=True)
+    model = models.CharField("模型", max_length=80, blank=True, default="")
+    days = models.PositiveSmallIntegerField("统计天数", default=30)
+    status = models.CharField(
+        "状态", max_length=12, choices=Status.choices, default=Status.PENDING
+    )
+    error_code = models.CharField("安全错误代码", max_length=30, blank=True, default="")
+    created_at = models.DateTimeField("提问时间", auto_now_add=True)
+    answered_at = models.DateTimeField("回答时间", null=True, blank=True)
+
+    class Meta:
+        db_table = "analytics_turns"
+        ordering = ("created_at", "id")
+        verbose_name = "AI 运营分析轮次"
+        verbose_name_plural = "AI 运营分析轮次"
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(days__in=(7, 30, 90)),
+                name="analytics_turn_days_valid",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=("conversation", "created_at"),
+                name="analytics_conv_created_idx",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.conversation} - {self.question[:30]}"
