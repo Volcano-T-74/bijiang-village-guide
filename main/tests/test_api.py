@@ -139,10 +139,8 @@ class TourismApiTests(TestCase):
             content_type="application/json",
             HTTP_X_VISITOR_SESSION_ID=session_id,
         )
-        self.assertEqual(response.status_code, 201)
-        slugs = [stop["slug"] for stop in response.json()["stops"]]
-        self.assertEqual(slugs[0], "huang-ancestral-hall")
-        self.assertNotIn("village-history-museum", slugs)
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("没有可继续推荐的景点", response.json()["detail"])
 
     def test_replanning_rejects_unknown_visited_attraction(self):
         session_id = self.create_session()

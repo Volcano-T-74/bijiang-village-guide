@@ -23,7 +23,7 @@ class DemoSeedTests(TestCase):
         self.assertEqual(Theme.objects.count(), 6)
         self.assertEqual(AttractionTheme.objects.count(), 21)
         self.assertEqual(StoryContent.objects.count(), 9)
-        self.assertEqual(AttractionPath.objects.count(), 40)
+        self.assertEqual(AttractionPath.objects.count(), 16)
 
     def test_seed_is_idempotent(self):
         call_command("seed_demo_data", verbosity=0)
@@ -33,7 +33,7 @@ class DemoSeedTests(TestCase):
         self.assertEqual(Theme.objects.count(), 6)
         self.assertEqual(AttractionTheme.objects.count(), 21)
         self.assertEqual(StoryContent.objects.count(), 9)
-        self.assertEqual(AttractionPath.objects.count(), 40)
+        self.assertEqual(AttractionPath.objects.count(), 16)
 
     def test_cross_river_paths_only_connect_through_bridge(self):
         west = {
@@ -60,7 +60,49 @@ class DemoSeedTests(TestCase):
             AttractionPath.objects.filter(from_attraction__slug="ancient-bridge")
             .values_list("to_attraction__slug", flat=True)
         )
-        self.assertEqual(bridge_neighbors, west | east)
+        self.assertEqual(
+            bridge_neighbors,
+            {
+                "village-history-museum",
+                "poetry-lane",
+                "bixi-scholar-hall",
+                "dong-ancestral-hall",
+            },
+        )
+
+    def test_separate_river_branches_do_not_have_direct_paths(self):
+        self.assertFalse(
+            AttractionPath.objects.filter(
+                from_attraction__slug="village-history-museum",
+                to_attraction__slug="poetry-lane",
+            ).exists()
+        )
+
+    def test_southeast_branch_only_connects_adjacent_stops(self):
+        self.assertTrue(
+            AttractionPath.objects.filter(
+                from_attraction__slug="dong-ancestral-hall",
+                to_attraction__slug="old-wharf",
+            ).exists()
+        )
+        self.assertTrue(
+            AttractionPath.objects.filter(
+                from_attraction__slug="old-wharf",
+                to_attraction__slug="waterside-ancient-tree",
+            ).exists()
+        )
+        self.assertFalse(
+            AttractionPath.objects.filter(
+                from_attraction__slug="dong-ancestral-hall",
+                to_attraction__slug="waterside-ancient-tree",
+            ).exists()
+        )
+        self.assertFalse(
+            AttractionPath.objects.filter(
+                from_attraction__slug="bixi-scholar-hall",
+                to_attraction__slug="dong-ancestral-hall",
+            ).exists()
+        )
 
     def test_depth_levels_theme_links_and_story_text_are_seeded(self):
         deep_slugs = set(
@@ -96,8 +138,8 @@ class DemoSeedTests(TestCase):
             path.estimated_minutes, math.ceil(expected_distance / 75)
         )
         scenic = AttractionPath.objects.get(
-            from_attraction=bridge,
-            to_attraction__slug="old-wharf",
+            from_attraction__slug="old-wharf",
+            to_attraction__slug="waterside-ancient-tree",
         )
         self.assertTrue(scenic.is_scenic_route)
 

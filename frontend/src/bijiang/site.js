@@ -72,10 +72,14 @@ let interests = [];
 let places = [];
 
 const DEMO_STORAGE_KEY = 'bijiang_indoor_demo_state';
+const DEMO_STORAGE_VERSION = 2;
 
 function readDemoState() {
   try {
-    return JSON.parse(localStorage.getItem(DEMO_STORAGE_KEY) || '{}');
+    const saved = JSON.parse(localStorage.getItem(DEMO_STORAGE_KEY) || '{}');
+    return saved.version === DEMO_STORAGE_VERSION
+      ? saved
+      : { ...saved, route: null };
   } catch {
     return {};
   }
@@ -106,6 +110,7 @@ const state = {
 
 function persistDemoState() {
   localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify({
+    version: DEMO_STORAGE_VERSION,
     interests: Array.from(state.interests),
     duration: state.duration,
     mode: state.mode,
@@ -434,7 +439,7 @@ function renderRoute() {
     <path d="${line}" />
   </svg>
 
-  ${places.map((place, index) => `
+  ${places.map(place => `
     <button
       class="map-marker ${routeIndex.has(place.slug) ? "is-route" : ""} ${state.visitedSlugs.has(place.slug) ? "is-visited" : ""} ${state.currentSimulatedSlug === place.slug ? "is-current" : ""} ${state.pendingArrival === place.slug ? "is-pending" : ""}"
       data-map-slug="${place.slug}"
@@ -442,7 +447,7 @@ function renderRoute() {
       aria-label="选择${place.name}作为模拟位置"
       aria-pressed="${state.pendingArrival === place.slug}"
     >
-      ${index + 1}
+      ${routeIndex.get(place.slug) || ""}
     </button>
   `).join("")}
 </section>
@@ -731,23 +736,21 @@ function reportBehavior(promise) {
   promise.catch(error => console.warn('behavior record failed', error.message));
 }
 
-const westBankSlugs = new Set([
-  "village-history-museum",
-  "huang-ancestral-hall",
-  "poetry-lane",
-  "xiuxi-peng-ancestral-hall",
-]);
-const eastBankSlugs = new Set([
-  "bixi-scholar-hall",
-  "dong-ancestral-hall",
-  "old-wharf",
-  "waterside-ancient-tree",
-]);
+const routeCorridors = [
+  ["ancient-bridge", "village-history-museum", "huang-ancestral-hall"],
+  ["ancient-bridge", "poetry-lane", "xiuxi-peng-ancestral-hall"],
+  ["ancient-bridge", "bixi-scholar-hall"],
+  ["ancient-bridge", "dong-ancestral-hall", "old-wharf", "waterside-ancient-tree"],
+];
 
-function bankOf(slug) {
-  if (westBankSlugs.has(slug)) return "west";
-  if (eastBankSlugs.has(slug)) return "east";
-  return slug === "ancient-bridge" ? "bridge" : "unknown";
+const routeNeighbors = new Map();
+for (const corridor of routeCorridors) {
+  for (let index = 0; index < corridor.length - 1; index += 1) {
+    const first = corridor[index];
+    const second = corridor[index + 1];
+    routeNeighbors.set(first, [...(routeNeighbors.get(first) || []), second]);
+    routeNeighbors.set(second, [...(routeNeighbors.get(second) || []), first]);
+  }
 }
 
 function itineraryReference(route = state.route) {
@@ -761,25 +764,6 @@ function buildLocalRoute({
   const selectedInterests = Array.from(state.interests);
   const visitedSet = new Set(visitedSlugs);
 
-  // 根据选择的兴趣筛选景点
-  let candidates = places.filter(place => {
-    if (visitedSet.has(place.slug) && place.slug !== startSlug) {
-      return false;
-    }
-
-    return (
-      Array.isArray(place.tags) &&
-      place.tags.some(tag => selectedInterests.includes(tag))
-    );
-  });
-
-  // 没有匹配到景点时，使用全部景点
-  if (!candidates.length) {
-    candidates = places.filter(place => {
-      return !visitedSet.has(place.slug) || place.slug === startSlug;
-    });
-  }
-
   // 根据游览时间决定景点数量
   const stopCount =
     state.duration <= 30
@@ -788,57 +772,38 @@ function buildLocalRoute({
         ? 4
         : 5;
 
-  const byMapPosition = (a, b) => {
-    const ay = Number(a.map_position?.y ?? 0);
-    const by = Number(b.map_position?.y ?? 0);
+  const availablePlaces = new Map(
+    places
+      .filter(place => !visitedSet.has(place.slug) || place.slug === startSlug)
+      .map(place => [place.slug, place]),
+  );
+  const startPlace = availablePlaces.get(startSlug);
+  const placeScore = place => 1 + (place.tags || []).filter(
+    tag => selectedInterests.includes(tag),
+  ).length * 10;
+  let bestRoute = startPlace ? [startPlace] : [];
+  let bestScore = startPlace ? placeScore(startPlace) : 0;
 
-    if (Math.abs(ay - by) < 10) {
-      return (
-        Number(a.map_position?.x ?? 0) -
-        Number(b.map_position?.x ?? 0)
-      );
+  function searchLocalRoute(route, score) {
+    if (
+      score > bestScore ||
+      (score === bestScore && route.length > bestRoute.length)
+    ) {
+      bestRoute = [...route];
+      bestScore = score;
     }
+    if (route.length >= stopCount) return;
 
-    return ay - by;
-  };
-  candidates.sort(byMapPosition);
+    const usedSlugs = new Set(route.map(place => place.slug));
+    for (const neighborSlug of routeNeighbors.get(route.at(-1).slug) || []) {
+      const neighbor = availablePlaces.get(neighborSlug);
+      if (!neighbor || usedSlugs.has(neighborSlug)) continue;
+      searchLocalRoute([...route, neighbor], score + placeScore(neighbor));
+    }
+  }
 
-  // 将起点放在第一个
-  const startPlace = places.find(place => place.slug === startSlug);
-
-  const startBank = bankOf(startSlug);
-  const remaining = candidates.filter(place => place.slug !== startSlug);
-  const sameBank = remaining.filter(place => bankOf(place.slug) === startBank);
-  const oppositeBank = remaining.filter(place => (
-    bankOf(place.slug) !== startBank && bankOf(place.slug) !== "bridge"
-  ));
-  const bridge = places.find(place => place.slug === "ancient-bridge");
-  const needsBridge = ["west", "east"].includes(startBank) && oppositeBank.length;
-  const westCandidates = remaining.filter(place => bankOf(place.slug) === "west");
-  const eastCandidates = remaining.filter(place => bankOf(place.slug) === "east");
-  const bridgeBank = westCandidates.length >= eastCandidates.length
-    ? westCandidates
-    : eastCandidates;
-  const orderedPlaces = startBank === "bridge"
-    ? [startPlace, ...bridgeBank].filter(Boolean)
-    : [
-        startPlace,
-        ...sameBank,
-        ...(needsBridge && bridge ? [bridge] : []),
-        ...oppositeBank,
-      ].filter(Boolean);
-
-  // 去重并截取需要的景点数量
-  const uniquePlaces = Array.from(
-    new Map(
-      orderedPlaces.map(place => [place.slug, place])
-    ).values()
-  ).slice(0, stopCount);
-
-  // 极端情况下确保至少有景点
-  const finalPlaces = uniquePlaces.length
-    ? uniquePlaces
-    : places.slice(0, stopCount);
+  if (startPlace) searchLocalRoute([startPlace], placeScore(startPlace));
+  const finalPlaces = bestRoute.length ? bestRoute : places.slice(0, 1);
 
   const visitMinutes = Math.max(
     12,
@@ -997,6 +962,7 @@ async function confirmSimulatedArrival() {
   const slug = state.pendingArrival;
   if (!slug) return;
   const isOffRoute = !state.route?.stops.some(stop => stop.slug === slug);
+  const previousRoute = state.route;
   state.currentSimulatedSlug = slug;
   state.visitedSlugs.add(slug);
   state.pendingArrival = null;
@@ -1025,15 +991,25 @@ async function confirmSimulatedArrival() {
     };
 
     try {
-      state.route = await generateItinerary(requestData);
+      const replannedRoute = await generateItinerary(requestData);
+      if (!replannedRoute?.stops || replannedRoute.stops.length < 2) {
+        throw new Error("暂无可用剩余路线");
+      }
+      state.route = replannedRoute;
       showToast(eventSynced ? "已从当前位置重新规划路线" : "已重新规划，足迹稍后同步");
     } catch (error) {
       console.warn("后台重新规划失败，使用本地路线：", error);
-      state.route = buildLocalRoute({
+      const localRoute = buildLocalRoute({
         startSlug: slug,
         visitedSlugs: Array.from(state.visitedSlugs),
       });
-      showToast("后台暂时无法连接，已在本地重新规划");
+      if (localRoute?.stops?.length > 1) {
+        state.route = localRoute;
+        showToast("后台暂时无法连接，已在本地重新规划");
+      } else {
+        state.route = previousRoute;
+        showToast("当前位置已保留，暂无可用剩余路线，请调整时长或兴趣");
+      }
     }
     persistDemoState();
     transition(render);

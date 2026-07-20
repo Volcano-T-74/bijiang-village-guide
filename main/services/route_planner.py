@@ -247,6 +247,8 @@ def generate_route(
     if best is None:
         raise NoRouteError("无法在给定约束下生成路线。")
     ordered = [attractions_by_id[item] for item in best.attraction_ids]
+    if len(ordered) < 2:
+        raise NoRouteError("没有可继续推荐的景点，请调整时长或兴趣。")
     return build_route_payload(
         ordered, preferences, mode, best.elapsed, best.score, paths
     )

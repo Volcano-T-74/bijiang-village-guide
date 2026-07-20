@@ -81,16 +81,37 @@ class RoutePlannerTests(TestCase):
         self.assertTrue(east.intersection(slugs))
         self.assertIn("ancient-bridge", slugs)
 
-    def test_visited_attractions_are_excluded_except_current_start(self):
+    def test_southeast_route_follows_the_river_without_backtracking(self):
         from main.services.route_planner import generate_route
 
-        route = generate_route(
-            [],
-            90,
-            "relaxed",
-            start_attraction_slug="huang-ancestral-hall",
-            visited_attraction_slugs={"village-history-museum", "huang-ancestral-hall"},
-        )
+        route = generate_route([], 90, "relaxed")
         slugs = [stop["slug"] for stop in route["stops"]]
-        self.assertEqual(slugs[0], "huang-ancestral-hall")
-        self.assertNotIn("village-history-museum", slugs)
+        southeast = [
+            slug
+            for slug in slugs
+            if slug
+            in {
+                "dong-ancestral-hall",
+                "old-wharf",
+                "waterside-ancient-tree",
+            }
+        ]
+        self.assertEqual(
+            southeast,
+            ["dong-ancestral-hall", "old-wharf", "waterside-ancient-tree"],
+        )
+
+    def test_visited_attractions_are_excluded_except_current_start(self):
+        from main.services.route_planner import NoRouteError, generate_route
+
+        with self.assertRaisesRegex(NoRouteError, "没有可继续推荐的景点"):
+            generate_route(
+                [],
+                90,
+                "relaxed",
+                start_attraction_slug="huang-ancestral-hall",
+                visited_attraction_slugs={
+                    "village-history-museum",
+                    "huang-ancestral-hall",
+                },
+            )

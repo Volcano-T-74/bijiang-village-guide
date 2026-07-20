@@ -86,33 +86,24 @@ class Command(BaseCommand):
                     attraction=attraction, theme=themes[theme_name]
                 )
 
-        west_slugs = {
-            "village-history-museum",
-            "huang-ancestral-hall",
-            "poetry-lane",
-            "xiuxi-peng-ancestral-hall",
-        }
-        east_slugs = {
-            "bixi-scholar-hall",
-            "dong-ancestral-hall",
-            "old-wharf",
-            "waterside-ancient-tree",
-        }
         bridge_slug = "ancient-bridge"
-        allowed_pairs = {
-            (first.slug, second.slug)
-            for bank in (west_slugs, east_slugs)
-            for first in attractions
-            for second in attractions
-            if first.slug in bank and second.slug in bank and first.pk != second.pk
-        }
-        allowed_pairs.update(
-            {
-                pair
-                for slug in west_slugs | east_slugs
-                for pair in ((slug, bridge_slug), (bridge_slug, slug))
-            }
+        corridors = (
+            (bridge_slug, "village-history-museum", "huang-ancestral-hall"),
+            (bridge_slug, "poetry-lane", "xiuxi-peng-ancestral-hall"),
+            (bridge_slug, "bixi-scholar-hall"),
+            (
+                bridge_slug,
+                "dong-ancestral-hall",
+                "old-wharf",
+                "waterside-ancient-tree",
+            ),
         )
+        allowed_pairs = {
+            pair
+            for corridor in corridors
+            for first_slug, second_slug in zip(corridor, corridor[1:])
+            for pair in ((first_slug, second_slug), (second_slug, first_slug))
+        }
         attractions_by_slug = {item.slug: item for item in attractions}
         AttractionPath.objects.filter(
             from_attraction__in=attractions,
@@ -121,23 +112,23 @@ class Command(BaseCommand):
 
         scenic_slugs = {bridge_slug, "old-wharf", "waterside-ancient-tree"}
         for first_slug, second_slug in sorted(allowed_pairs):
-                first = attractions_by_slug[first_slug]
-                second = attractions_by_slug[second_slug]
-                distance = demo_distance(first, second)
-                AttractionPath.objects.update_or_create(
-                    from_attraction=first,
-                    to_attraction=second,
-                    defaults={
-                        "distance_meters": distance,
-                        "estimated_minutes": math.ceil(distance / 75),
-                        "is_scenic_route": (
-                            first.slug in scenic_slugs and second.slug in scenic_slugs
-                        ),
-                    },
-                )
+            first = attractions_by_slug[first_slug]
+            second = attractions_by_slug[second_slug]
+            distance = demo_distance(first, second)
+            AttractionPath.objects.update_or_create(
+                from_attraction=first,
+                to_attraction=second,
+                defaults={
+                    "distance_meters": distance,
+                    "estimated_minutes": math.ceil(distance / 75),
+                    "is_scenic_route": (
+                        first.slug in scenic_slugs and second.slug in scenic_slugs
+                    ),
+                },
+            )
 
         self.stdout.write(
             self.style.SUCCESS(
-                "Demo data ready: 4 zones, 9 attractions, 6 themes, 9 stories, 40 paths."
+                "Demo data ready: 4 zones, 9 attractions, 6 themes, 9 stories, 16 paths."
             )
         )
