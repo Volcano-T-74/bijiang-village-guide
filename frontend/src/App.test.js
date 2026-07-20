@@ -531,4 +531,37 @@ describe('Bijiang village website', () => {
     await wrapper.get('[data-local-voice-id="1"]').trigger('click')
     expect(first.play).toHaveBeenCalled()
   })
+
+  it('escapes local voice markup from the API', async () => {
+    fetch.mockImplementation((url) => {
+      if (url === '/api/v1/sessions/') return jsonResponse({ id: 'session-1' }, 201)
+      if (url === '/api/v1/bootstrap/') return jsonResponse(bootstrap)
+      if (url === '/api/v1/local-voices/') return jsonResponse([{
+        id: 1, title: '<img data-attack src=x>', language_label: '<script>bad()</script>',
+        file_url: '/static/audio/one.m4a', duration_seconds: 'not-a-number',
+      }])
+      return jsonResponse({ detail: 'not found' }, 404)
+    })
+    history.replaceState({}, '', '/#stories')
+    const wrapper = mount(App, { attachTo: document.body })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('<img data-attack src=x>')
+    expect(wrapper.find('[data-attack]').exists()).toBe(false)
+    expect(wrapper.find('script').exists()).toBe(false)
+    expect(wrapper.text()).toContain('00:00')
+  })
+
+  it('pauses local voice playback when hash navigation leaves stories', async () => {
+    const audio = { pause: vi.fn(), play: vi.fn(() => Promise.resolve()), addEventListener: vi.fn(), currentTime: 0 }
+    vi.stubGlobal('Audio', vi.fn(function AudioMock() { return audio }))
+    history.replaceState({}, '', '/#stories')
+    const wrapper = mount(App, { attachTo: document.body })
+    await flushPromises()
+    await wrapper.get('[data-local-voice-id="1"]').trigger('click')
+
+    location.hash = '#home'
+    window.dispatchEvent(new HashChangeEvent('hashchange'))
+    expect(audio.pause).toHaveBeenCalled()
+  })
 })
