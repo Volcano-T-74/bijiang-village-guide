@@ -1,5 +1,5 @@
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect
 from django.views.decorators.http import require_GET, require_POST
 
 from main.forms import AnalyticsConversationForm, AnalyticsQuestionForm
@@ -13,6 +13,10 @@ from main.services.analytics_conversation import (
 ERROR_HTTP_STATUSES = {
     "configuration": 503,
     "timeout": 504,
+    "authentication": 502,
+    "balance": 402,
+    "rate_limit": 429,
+    "network": 502,
     "upstream": 502,
     "response": 502,
 }
@@ -63,15 +67,7 @@ def _turn_response(turn):
 
 @require_GET
 def ai_analytics_page(request):
-    conversations = AnalyticsConversation.objects.filter(owner=request.user)
-    return render(
-        request,
-        "admin/ai_analytics.html",
-        {
-            "title": "AI 运营分析",
-            "conversations": conversations,
-        },
-    )
+    return redirect("admin_data_overview")
 
 
 @require_POST
