@@ -92,6 +92,17 @@ describe('Bijiang village website', () => {
     vi.unstubAllGlobals()
   })
 
+  it('provides a valid image URL for every API interest theme', async () => {
+    const wrapper = mount(App, { attachTo: document.body })
+    await flushPromises()
+
+    await wrapper.get('[data-route="interests"]').trigger('click')
+
+    const sources = wrapper.findAll('.interest-card img').map(image => image.attributes('src'))
+    expect(sources.length).toBeGreaterThan(0)
+    expect(sources.every(source => source && source !== 'undefined')).toBe(true)
+  })
+
   it('renders route attraction introductions without detail links', async () => {
     const wrapper = mount(App, { attachTo: document.body })
     await flushPromises()

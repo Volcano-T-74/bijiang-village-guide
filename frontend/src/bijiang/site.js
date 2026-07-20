@@ -56,6 +56,12 @@ const interestBgImg = new URL('./assets/兴趣路线背景图.webp', import.meta
 const routePreviewImg = new URL('./assets/路线预览.webp', import.meta.url).href;
 
 const interestIconMap = {
+  "岭南建筑": new URL('./assets/古建筑.webp', import.meta.url).href,
+  "诗书文脉": new URL('./assets/诗词记忆.webp', import.meta.url).href,
+  "宗族记忆": new URL('./assets/宗族故事.webp', import.meta.url).href,
+  "水乡商贸": new URL('./assets/民俗生活.webp', import.meta.url).href,
+  "古村变迁": new URL('./assets/巷道漫游.webp', import.meta.url).href,
+  "自然水岸": new URL('./assets/水岸风景.webp', import.meta.url).href,
   "古建筑": new URL('./assets/古建筑.webp', import.meta.url).href,
   "宗族故事": new URL('./assets/宗族故事.webp', import.meta.url).href,
   "人物旧居": new URL('./assets/人物旧居.webp', import.meta.url).href,
