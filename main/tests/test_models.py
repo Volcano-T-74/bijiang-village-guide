@@ -1,5 +1,5 @@
 from django.db import models
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 
 from main.models import (
     Attraction,
@@ -19,7 +19,7 @@ from main.models import (
 )
 
 
-class LocalVoiceTests(SimpleTestCase):
+class LocalVoiceTests(TestCase):
     def test_model_contract(self):
         expected_fields = {
             "title": (models.CharField, 100),
@@ -47,13 +47,27 @@ class LocalVoiceTests(SimpleTestCase):
         self.assertIs(LocalVoice._meta.get_field("is_active").default, True)
 
     def test_model_metadata_and_string_representation(self):
-        voice = LocalVoice(title="碧江乡音")
+        second = LocalVoice.objects.create(
+            title="第二段乡音",
+            original_file_name="second.mp3",
+            file_url="https://example.com/second.mp3",
+            duration_seconds=12,
+            display_order=2,
+        )
+        first = LocalVoice.objects.create(
+            title="第一段乡音",
+            original_file_name="first.mp3",
+            file_url="https://example.com/first.mp3",
+            duration_seconds=8,
+            display_order=1,
+        )
 
         self.assertEqual(LocalVoice._meta.db_table, "local_voices")
         self.assertEqual(LocalVoice._meta.ordering, ("display_order", "id"))
         self.assertEqual(LocalVoice._meta.verbose_name, "当地声音")
         self.assertEqual(LocalVoice._meta.verbose_name_plural, "当地声音")
-        self.assertEqual(str(voice), "碧江乡音")
+        self.assertEqual(list(LocalVoice.objects.all()), [first, second])
+        self.assertEqual(str(first), "第一段乡音")
 
 
 class DomainModelContractTests(SimpleTestCase):

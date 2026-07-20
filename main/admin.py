@@ -164,7 +164,7 @@ class LocalVoiceAdmin(admin.ModelAdmin):
         "file_link",
     )
     list_editable = ("display_order", "is_active")
-    list_filter = ("language", "language_label", "is_active")
+    list_filter = ("language", "is_active")
     search_fields = ("title", "original_file_name")
 
     @admin.display(description="音频文件")
