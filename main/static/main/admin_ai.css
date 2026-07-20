@@ -190,9 +190,9 @@
 @keyframes ai-pulse { from { opacity: 0.55; } to { opacity: 1; } }
 
 @media (max-width: 860px) {
-  .ai-workspace { height: calc(100dvh - 110px); min-height: 440px; grid-template-columns: 1fr; grid-template-rows: minmax(110px, 150px) minmax(0, 1fr); }
+  .ai-workspace { height: calc(200dvh - 110px); min-height: 440px; grid-template-columns: 1fr; grid-template-rows: 220px minmax(0, 1fr); }
   .ai-sidebar { min-height: 0; overflow: hidden; border-right: 0; border-bottom: 1px solid var(--ai-border); }
-  .ai-conversation-list { display: flex; min-height: auto; overflow-x: auto; }
+  .ai-conversation-list { display: flex; min-height: auto; overflow-x: auto; overflow-y: hidden; }
   .ai-conversation-row { width: 220px; min-width: 220px; grid-template-columns: minmax(0, 1fr) 30px; }
   .ai-conversation-row + .ai-conversation-row { margin-top: 0; margin-left: 4px; }
   .ai-chat { min-height: 0; }

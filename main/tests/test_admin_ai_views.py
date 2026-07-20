@@ -108,7 +108,7 @@ class AdminAiViewsTests(TestCase):
         self.assertRegex(css, r"(?s)\.ai-messages\s*\{[^}]*touch-action:\s*pan-y")
         self.assertRegex(
             css,
-            r"(?s)@media \(max-width: 860px\).*?\.ai-workspace\s*\{[^}]*height:\s*calc\(100dvh - 110px\)[^}]*grid-template-rows:\s*minmax\(110px, 150px\) minmax\(0, 1fr\)",
+            r"(?s)@media \(max-width: 860px\).*?\.ai-workspace\s*\{[^}]*height:\s*calc\(200dvh - 110px\)[^}]*grid-template-rows:\s*220px minmax\(0, 1fr\)",
         )
         javascript = (Path(__file__).resolve().parents[1] / "static" / "main" / "admin_ai.js").read_text(
             encoding="utf-8"
