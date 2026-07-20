@@ -35,10 +35,19 @@
     </div>
     <nav id="ai-conversation-list" class="ai-conversation-list" aria-label="历史会话">
       {% for conversation in conversations %}
-        <button class="ai-conversation-item" type="button" data-conversation-id="{{ conversation.id }}">
-          <span>{{ conversation.title }}</span>
-          <time datetime="{{ conversation.updated_at|date:'c' }}">{{ conversation.updated_at|date:"m-d H:i" }}</time>
-        </button>
+        <div class="ai-conversation-row" data-conversation-row="{{ conversation.id }}">
+          <button class="ai-conversation-item" type="button" data-conversation-id="{{ conversation.id }}">
+            <span>{{ conversation.title }}</span>
+            <time datetime="{{ conversation.updated_at|date:'c' }}">{{ conversation.updated_at|date:"m-d H:i" }}</time>
+          </button>
+          <button
+            class="ai-delete-conversation"
+            type="button"
+            data-delete-conversation="{{ conversation.id }}"
+            aria-label="删除对话：{{ conversation.title }}"
+            title="删除对话"
+          ><i class="fas fa-trash-alt" aria-hidden="true"></i></button>
+        </div>
       {% empty %}
         <p id="ai-no-conversations" class="ai-sidebar-empty">暂无历史会话</p>
       {% endfor %}

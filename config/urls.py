@@ -24,6 +24,7 @@ from main.admin_ai_views import (
     ask_conversation,
     conversation_detail,
     create_conversation,
+    delete_conversation,
     retry_turn,
 )
 
@@ -42,6 +43,11 @@ urlpatterns = [
         "admin/ai-analytics/conversations/<int:conversation_id>/",
         admin.site.admin_view(conversation_detail),
         name="admin_ai_conversation_detail",
+    ),
+    path(
+        "admin/ai-analytics/conversations/<int:conversation_id>/delete/",
+        admin.site.admin_view(delete_conversation),
+        name="admin_ai_conversation_delete",
     ),
     path(
         "admin/ai-analytics/conversations/<int:conversation_id>/ask/",

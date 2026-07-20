@@ -106,6 +106,14 @@ def conversation_detail(request, conversation_id):
 
 
 @require_POST
+def delete_conversation(request, conversation_id):
+    conversation = _conversation_for_user(request.user, conversation_id)
+    deleted_id = conversation.id
+    conversation.delete()
+    return JsonResponse({"status": "deleted", "data": {"id": deleted_id}})
+
+
+@require_POST
 def ask_conversation(request, conversation_id):
     conversation = _conversation_for_user(request.user, conversation_id)
     form = AnalyticsQuestionForm(request.POST)

@@ -132,6 +132,12 @@
     messages.replaceChildren(loading);
   }
 
+  function scrollToLatest() {
+    window.requestAnimationFrame(() => {
+      messages.scrollTop = messages.scrollHeight;
+    });
+  }
+
   function updateActiveConversation(conversation) {
     conversationList.querySelectorAll("[data-conversation-id]").forEach((button) => {
       const active = Number(button.dataset.conversationId) === conversation.id;
@@ -143,6 +149,8 @@
 
   function addConversationButton(conversation) {
     document.getElementById("ai-no-conversations")?.remove();
+    const row = createElement("div", "ai-conversation-row");
+    row.dataset.conversationRow = String(conversation.id);
     const button = createElement("button", "ai-conversation-item");
     button.type = "button";
     button.dataset.conversationId = String(conversation.id);
@@ -150,7 +158,16 @@
     const time = createElement("time", "", "刚刚");
     time.dateTime = conversation.updated_at;
     button.appendChild(time);
-    conversationList.prepend(button);
+    const remove = createElement("button", "ai-delete-conversation");
+    remove.type = "button";
+    remove.dataset.deleteConversation = String(conversation.id);
+    remove.title = "删除对话";
+    remove.setAttribute("aria-label", `删除对话：${conversation.title}`);
+    const icon = createElement("i", "fas fa-trash-alt");
+    icon.setAttribute("aria-hidden", "true");
+    remove.appendChild(icon);
+    row.append(button, remove);
+    conversationList.prepend(row);
   }
 
   async function loadConversation(id) {
@@ -170,7 +187,7 @@
       url.searchParams.set("conversation", String(conversation.id));
       window.history.replaceState({}, "", url);
       setStatus("");
-      messages.scrollTop = messages.scrollHeight;
+      scrollToLatest();
     } catch (error) {
       renderEmptyState();
       setStatus("会话载入失败，请刷新页面。", true);
@@ -231,7 +248,52 @@
     }
   }
 
+  async function deleteConversation(button) {
+    if (busy) return;
+    const conversationId = Number(button.dataset.deleteConversation);
+    const row = button.closest("[data-conversation-row]");
+    const label = row?.querySelector(".ai-conversation-item span")?.textContent || "这条对话";
+    if (!window.confirm(`确定删除“${label}”及其全部问答吗？此操作不可撤销。`)) return;
+
+    setBusy(true);
+    setStatus("正在删除对话…");
+    try {
+      const result = await request(
+        `${root.dataset.conversationBase}${conversationId}/delete/`,
+        { method: "POST" }
+      );
+      if (!result.ok) throw new Error("delete");
+      row?.remove();
+      if (currentConversationId === conversationId) {
+        const next = conversationList.querySelector("[data-conversation-id]");
+        if (next) {
+          await loadConversation(next.dataset.conversationId);
+        } else {
+          currentConversationId = null;
+          title.textContent = "新对话";
+          renderEmptyState();
+          const empty = createElement("p", "ai-sidebar-empty", "暂无历史会话");
+          empty.id = "ai-no-conversations";
+          conversationList.appendChild(empty);
+          const url = new URL(window.location.href);
+          url.searchParams.delete("conversation");
+          window.history.replaceState({}, "", url);
+        }
+      }
+      setStatus("对话已删除。");
+    } catch (error) {
+      setStatus("删除失败，请稍后重试。", true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   conversationList.addEventListener("click", (event) => {
+    const remove = event.target.closest("[data-delete-conversation]");
+    if (remove) {
+      deleteConversation(remove);
+      return;
+    }
     const button = event.target.closest("[data-conversation-id]");
     if (button && !busy) loadConversation(button.dataset.conversationId);
   });

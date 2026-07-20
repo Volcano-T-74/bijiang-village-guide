@@ -1,4 +1,5 @@
 from unittest.mock import patch
+from pathlib import Path
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -49,6 +50,7 @@ class AdminAiViewsTests(TestCase):
         response = self.client.get("/admin/ai-analytics/")
 
         self.assertContains(response, 'id="ai-conversation-list"', html=False)
+        self.assertContains(response, 'data-delete-conversation="', html=False)
         self.assertContains(response, 'id="ai-new-conversation"', html=False)
         self.assertContains(response, 'id="ai-days"', html=False)
         self.assertContains(response, '<option value="7">最近 7 天</option>', html=True)
@@ -72,6 +74,35 @@ class AdminAiViewsTests(TestCase):
         self.assertEqual(own.status_code, 200)
         self.assertEqual(own.json()["data"]["title"], "我的运营分析")
         self.assertEqual(other.status_code, 404)
+
+    def test_deletes_only_owned_conversation_and_its_turns(self):
+        turn = AnalyticsTurn.objects.create(
+            conversation=self.conversation,
+            question="待删除问题",
+            days=30,
+        )
+        self.client.force_login(self.staff)
+
+        deleted = self.client.post(
+            f"/admin/ai-analytics/conversations/{self.conversation.pk}/delete/"
+        )
+        forbidden = self.client.post(
+            f"/admin/ai-analytics/conversations/{self.other_conversation.pk}/delete/"
+        )
+
+        self.assertEqual(deleted.status_code, 200)
+        self.assertEqual(deleted.json()["data"]["id"], self.conversation.pk)
+        self.assertFalse(AnalyticsConversation.objects.filter(pk=self.conversation.pk).exists())
+        self.assertFalse(AnalyticsTurn.objects.filter(pk=turn.pk).exists())
+        self.assertEqual(forbidden.status_code, 404)
+
+    def test_message_grid_can_shrink_and_scroll(self):
+        css = (Path(__file__).resolve().parents[1] / "static" / "main" / "admin_ai.css").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertRegex(css, r"(?s)\.ai-chat\s*\{[^}]*min-height:\s*0")
+        self.assertRegex(css, r"(?s)\.ai-messages\s*\{[^}]*min-height:\s*0[^}]*overflow-y:\s*auto")
 
     def test_creates_conversation_and_validates_days(self):
         self.client.force_login(self.staff)
