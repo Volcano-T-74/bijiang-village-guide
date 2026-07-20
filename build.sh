@@ -9,4 +9,5 @@ corepack pnpm --dir frontend build
 
 python manage.py collectstatic --noinput
 python manage.py migrate --noinput
+python manage.py import_local_voices
 python manage.py seed_demo_data
