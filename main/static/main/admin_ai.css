@@ -196,6 +196,7 @@
   .ai-conversation-row { width: 220px; min-width: 220px; grid-template-columns: minmax(0, 1fr) 30px; }
   .ai-conversation-row + .ai-conversation-row { margin-top: 0; margin-left: 4px; }
   .ai-chat { min-height: 0; }
+  .ai-messages { overscroll-behavior-y: auto; }
   .ai-chat-header { align-items: flex-start; flex-direction: column; }
   .ai-days-label { width: 100%; justify-content: space-between; }
 }

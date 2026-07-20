@@ -110,6 +110,10 @@ class AdminAiViewsTests(TestCase):
             css,
             r"(?s)@media \(max-width: 860px\).*?\.ai-workspace\s*\{[^}]*height:\s*calc\(200dvh - 110px\)[^}]*grid-template-rows:\s*220px minmax\(0, 1fr\)",
         )
+        self.assertRegex(
+            css,
+            r"(?s)@media \(max-width: 860px\).*?\.ai-messages\s*\{[^}]*overscroll-behavior-y:\s*auto",
+        )
         javascript = (Path(__file__).resolve().parents[1] / "static" / "main" / "admin_ai.js").read_text(
             encoding="utf-8"
         )
