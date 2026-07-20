@@ -530,6 +530,7 @@ describe('Bijiang village website', () => {
     await flushPromises()
     await wrapper.get('[data-local-voice-id="1"]').trigger('click')
     expect(first.play).toHaveBeenCalled()
+    expect(wrapper.text()).toContain('00:00 / 01:28')
   })
 
   it('escapes local voice markup from the API', async () => {

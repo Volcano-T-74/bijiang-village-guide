@@ -144,6 +144,7 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [
     BASE_DIR / "frontend" / "dist",
+    BASE_DIR / "frontend" / "public",
     BASE_DIR / "frontend" / "src" / "bijiang" / "assets",
 ]
 
