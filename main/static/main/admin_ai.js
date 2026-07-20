@@ -308,6 +308,18 @@
     if (retry) retryTurn(retry.dataset.retryTurn);
   });
 
+  messages.addEventListener("wheel", (event) => {
+    if (messages.scrollHeight <= messages.clientHeight) return;
+    const canScrollUp = event.deltaY < 0 && messages.scrollTop > 0;
+    const canScrollDown =
+      event.deltaY > 0 &&
+      messages.scrollTop + messages.clientHeight < messages.scrollHeight - 1;
+    if (!canScrollUp && !canScrollDown) return;
+    event.preventDefault();
+    event.stopPropagation();
+    messages.scrollTop += event.deltaY;
+  }, { passive: false });
+
   newButton.addEventListener("click", async () => {
     if (busy) return;
     setBusy(true);

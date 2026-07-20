@@ -62,6 +62,8 @@ class AdminAiViewsTests(TestCase):
         self.assertContains(response, "最近30天哪个景点最受欢迎？")
         self.assertContains(response, "main/admin_ai.css")
         self.assertContains(response, "main/admin_ai.js")
+        self.assertContains(response, "admin_ai.css?v=")
+        self.assertContains(response, "admin_ai.js?v=")
 
     def test_conversation_detail_enforces_ownership(self):
         self.client.force_login(self.staff)
@@ -102,7 +104,12 @@ class AdminAiViewsTests(TestCase):
         )
 
         self.assertRegex(css, r"(?s)\.ai-chat\s*\{[^}]*min-height:\s*0")
-        self.assertRegex(css, r"(?s)\.ai-messages\s*\{[^}]*min-height:\s*0[^}]*overflow-y:\s*auto")
+        self.assertRegex(css, r"(?s)\.ai-messages\s*\{[^}]*min-height:\s*0[^}]*overflow-y:\s*scroll")
+        self.assertRegex(css, r"(?s)\.ai-messages\s*\{[^}]*touch-action:\s*pan-y")
+        javascript = (Path(__file__).resolve().parents[1] / "static" / "main" / "admin_ai.js").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('messages.addEventListener("wheel"', javascript)
 
     def test_creates_conversation_and_validates_days(self):
         self.client.force_login(self.staff)

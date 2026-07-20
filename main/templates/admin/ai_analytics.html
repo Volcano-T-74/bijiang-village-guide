@@ -3,12 +3,12 @@
 
 {% block extrastyle %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'main/admin_ai.css' %}">
+<link rel="stylesheet" href="{% static 'main/admin_ai.css' %}?v=20260720-scroll2">
 {% endblock %}
 
 {% block extrahead %}
 {{ block.super }}
-<script src="{% static 'main/admin_ai.js' %}" defer></script>
+<script src="{% static 'main/admin_ai.js' %}?v=20260720-scroll2" defer></script>
 {% endblock %}
 
 {% block breadcrumbs %}
@@ -71,7 +71,7 @@
       </label>
     </header>
 
-    <div id="ai-messages" class="ai-messages" aria-live="polite" aria-busy="false">
+    <div id="ai-messages" class="ai-messages" aria-label="对话内容" aria-live="polite" aria-busy="false" tabindex="0">
       <div id="ai-empty-state" class="ai-empty-state">
         <i class="fas fa-chart-line" aria-hidden="true"></i>
         <h3>开始一次运营分析</h3>
