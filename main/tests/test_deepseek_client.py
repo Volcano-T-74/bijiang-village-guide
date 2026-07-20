@@ -102,14 +102,14 @@ class DeepSeekClientTests(SimpleTestCase):
 
     @override_settings(DEEPSEEK_TIMEOUT_SECONDS=120)
     @patch("main.services.deepseek_client.urlopen")
-    def test_caps_provider_timeout_below_gunicorn_timeout(self, mocked_urlopen):
+    def test_respects_configured_provider_timeout(self, mocked_urlopen):
         mocked_urlopen.return_value = mock_response(
             {"choices": [{"message": {"content": json.dumps(ANALYSIS)}}]}
         )
 
         analyze_visitor_metrics("问题", METRICS)
 
-        self.assertEqual(mocked_urlopen.call_args.kwargs["timeout"], 60)
+        self.assertEqual(mocked_urlopen.call_args.kwargs["timeout"], 120)
 
     @override_settings(DEEPSEEK_API_KEY="")
     def test_requires_api_key(self):

@@ -97,9 +97,7 @@ def analyze_visitor_metrics(question, metrics, history=None):
     )
 
     try:
-        with urlopen(
-            request, timeout=min(settings.DEEPSEEK_TIMEOUT_SECONDS, 60)
-        ) as response:
+        with urlopen(request, timeout=settings.DEEPSEEK_TIMEOUT_SECONDS) as response:
             response_payload = json.loads(response.read().decode("utf-8"))
     except (socket.timeout, TimeoutError) as exc:
         raise DeepSeekTimeoutError("DeepSeek request timed out.") from exc

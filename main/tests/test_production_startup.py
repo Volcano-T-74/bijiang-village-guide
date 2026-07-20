@@ -10,7 +10,7 @@ class ProductionStartupTests(SimpleTestCase):
         )
 
         self.assertIn("--threads 2", start_script)
-        self.assertIn("--timeout 90", start_script)
+        self.assertIn("--timeout 180", start_script)
 
     def test_render_config_uses_requested_openai_compatible_provider(self):
         render_config = (Path(__file__).resolve().parents[2] / "render.yaml").read_text(
@@ -23,4 +23,4 @@ class ProductionStartupTests(SimpleTestCase):
             "- key: DEEPSEEK_BASE_URL\n        value: https://api.ldwnb666.xyz/v1",
             render_config,
         )
-        self.assertIn("- key: DEEPSEEK_TIMEOUT_SECONDS\n        value: \"60\"", render_config)
+        self.assertIn("- key: DEEPSEEK_TIMEOUT_SECONDS\n        value: \"120\"", render_config)

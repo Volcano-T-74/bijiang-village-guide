@@ -10,4 +10,4 @@ fi
 gunicorn config.wsgi:application \
   --bind "0.0.0.0:${PORT:-8000}" \
   --threads 2 \
-  --timeout 90
+  --timeout 180
