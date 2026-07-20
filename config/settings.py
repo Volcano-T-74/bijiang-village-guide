@@ -144,9 +144,11 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [
     BASE_DIR / "frontend" / "dist",
-    BASE_DIR / "frontend" / "public",
-    BASE_DIR / "frontend" / "src" / "bijiang" / "assets",
 ]
+WHITENOISE_MAX_AGE = int(os.environ.get("WHITENOISE_MAX_AGE", "86400"))
+WHITENOISE_IMMUTABLE_FILE_TEST = (
+    r"/frontend/assets/[^/]+-[A-Za-z0-9_-]{8}\.[^/]+$"
+)
 
 if not DEBUG:
     STORAGES = {
