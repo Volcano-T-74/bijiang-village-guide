@@ -7,7 +7,6 @@ from .models import (
     Attraction,
     AttractionPath,
     AttractionTheme,
-    AnalyticsConversation,
     AudioAsset,
     Favorite,
     Footprint,
@@ -80,9 +79,6 @@ def data_overview(request):
         "recent_events": VisitorEvent.objects.select_related(
             "session", "attraction", "itinerary"
         ).order_by("-created_at")[:5],
-        "ai_conversations": AnalyticsConversation.objects.filter(
-            owner=request.user
-        ).order_by("-updated_at", "-id"),
     }
     return render(request, "admin/data_overview.html", context)
 

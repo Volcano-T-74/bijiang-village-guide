@@ -1,15 +1,4 @@
 {% extends "admin/base_site.html" %}
-{% load static %}
-
-{% block extrastyle %}
-{{ block.super }}
-<link rel="stylesheet" href="{% static 'main/admin_ai.css' %}">
-{% endblock %}
-
-{% block extrahead %}
-{{ block.super }}
-<script src="{% static 'main/admin_ai.js' %}" defer></script>
-{% endblock %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs"><a href="{% url 'admin:index' %}">首页</a> &rsaquo; 数据概览</div>
@@ -43,70 +32,6 @@
     <a class="stat-item" href="{{ item.url }}"><span>{{ item.label }}</span><strong>{{ item.count }}</strong></a>
   {% endfor %}
 </div>
-
-<section
-  id="ai-workspace"
-  class="ai-workspace overview-section"
-  data-create-url="{% url 'admin_ai_conversation_create' %}"
-  data-conversation-base="/admin/ai-analytics/conversations/"
-  data-turn-base="/admin/ai-analytics/turns/"
->
-  <header class="ai-panel-header">
-    <div class="ai-panel-title">
-      <span class="ai-status-dot" aria-hidden="true"></span>
-      <div>
-        <h2>AI 运营分析</h2>
-        <span id="ai-chat-title">新对话</span>
-      </div>
-    </div>
-    <div class="ai-panel-controls">
-      <label for="ai-conversation-select">
-        历史会话
-        <select id="ai-conversation-select" name="conversation">
-          <option value="">新对话</option>
-          {% for conversation in ai_conversations %}
-            <option value="{{ conversation.id }}">{{ conversation.title }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <button id="ai-new-conversation" class="ai-icon-button" type="button" title="新建对话" aria-label="新建对话">
-        <i class="fas fa-plus" aria-hidden="true"></i>
-      </button>
-      <label for="ai-days">
-        统计周期
-        <select id="ai-days" name="days">
-          <option value="7">最近 7 天</option>
-          <option value="30" selected>最近 30 天</option>
-          <option value="90">最近 90 天</option>
-        </select>
-      </label>
-    </div>
-  </header>
-
-  <div id="ai-messages" class="ai-messages" aria-live="polite" aria-busy="false">
-    <div id="ai-empty-state" class="ai-empty-state">
-      <h3>开始一次运营分析</h3>
-      <div class="ai-examples" aria-label="示例问题">
-        <button type="button" data-example-question="最近30天哪个景点最受欢迎？">最近30天哪个景点最受欢迎？</button>
-        <button type="button" data-example-question="哪些景点适合投放文创或小吃摊？">哪些景点适合投放文创或小吃摊？</button>
-        <button type="button" data-example-question="目前的数据有哪些局限性？">目前的数据有哪些局限性？</button>
-      </div>
-    </div>
-  </div>
-
-  <form id="ai-question-form" class="ai-composer" method="post">
-    {% csrf_token %}
-    <label for="ai-question" class="sr-only">输入运营分析问题</label>
-    <textarea id="ai-question" name="question" maxlength="1000" rows="2" placeholder="询问景点热度、经营点位或游客偏好" required></textarea>
-    <div class="ai-composer-footer">
-      <span id="ai-request-status" role="status" aria-live="polite"></span>
-      <button id="ai-send" class="ai-send-button" type="submit">
-        <i class="fas fa-paper-plane" aria-hidden="true"></i>
-        <span>发送</span>
-      </button>
-    </div>
-  </form>
-</section>
 
 <section class="overview-section module">
   <h2>最近游客会话</h2>

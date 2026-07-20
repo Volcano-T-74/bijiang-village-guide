@@ -12,9 +12,10 @@ class SimpleUIMenuTests(TestCase):
         from django.conf import settings
 
         groups = {item["name"]: item for item in settings.SIMPLEUI_CONFIG["menus"]}
-        self.assertNotIn("AI 运营分析", groups)
+        self.assertIn("AI 运营分析", groups)
+        self.assertEqual(groups["AI 运营分析"]["url"], "/admin/ai-analytics/")
         self.assertEqual(
-            set(groups),
+            set(groups) - {"AI 运营分析"},
             {"数据概览", "内容资产库", "空间与路线", "触点管理", "游客行为", "系统管理"},
         )
         content_urls = {item["url"] for item in groups["内容资产库"]["models"]}

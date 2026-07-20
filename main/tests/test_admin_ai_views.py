@@ -29,7 +29,7 @@ class AdminAiViewsTests(TestCase):
             owner=self.other_staff, title="其他人的分析", default_days=30
         )
 
-    def test_old_page_requires_staff_and_redirects_staff_to_data_overview(self):
+    def test_page_requires_staff_and_lists_only_owned_conversations(self):
         response = self.client.get("/admin/ai-analytics/")
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse("admin:login"), response.url)
@@ -39,25 +39,16 @@ class AdminAiViewsTests(TestCase):
 
         self.client.force_login(self.staff)
         response = self.client.get("/admin/ai-analytics/")
-        self.assertRedirects(
-            response,
-            reverse("admin_data_overview"),
-            fetch_redirect_response=False,
-        )
-
-    def test_data_overview_lists_only_owned_conversations(self):
-        self.client.force_login(self.staff)
-        response = self.client.get("/admin/data-overview/")
-
+        self.assertEqual(response.status_code, 200)
         self.assertContains(response, "我的运营分析")
         self.assertNotContains(response, "其他人的分析")
 
     def test_page_renders_accessible_conversation_controls(self):
         self.client.force_login(self.staff)
 
-        response = self.client.get("/admin/data-overview/")
+        response = self.client.get("/admin/ai-analytics/")
 
-        self.assertContains(response, 'id="ai-conversation-select"', html=False)
+        self.assertContains(response, 'id="ai-conversation-list"', html=False)
         self.assertContains(response, 'id="ai-new-conversation"', html=False)
         self.assertContains(response, 'id="ai-days"', html=False)
         self.assertContains(response, '<option value="7">最近 7 天</option>', html=True)
