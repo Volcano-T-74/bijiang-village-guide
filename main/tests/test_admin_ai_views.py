@@ -43,6 +43,24 @@ class AdminAiViewsTests(TestCase):
         self.assertContains(response, "我的运营分析")
         self.assertNotContains(response, "其他人的分析")
 
+    def test_page_renders_accessible_conversation_controls(self):
+        self.client.force_login(self.staff)
+
+        response = self.client.get("/admin/ai-analytics/")
+
+        self.assertContains(response, 'id="ai-conversation-list"', html=False)
+        self.assertContains(response, 'id="ai-new-conversation"', html=False)
+        self.assertContains(response, 'id="ai-days"', html=False)
+        self.assertContains(response, '<option value="7">最近 7 天</option>', html=True)
+        self.assertContains(response, '<option value="30" selected>最近 30 天</option>', html=True)
+        self.assertContains(response, '<option value="90">最近 90 天</option>', html=True)
+        self.assertContains(response, 'id="ai-question"', html=False)
+        self.assertContains(response, 'id="ai-send"', html=False)
+        self.assertContains(response, 'aria-live="polite"', html=False)
+        self.assertContains(response, "最近30天哪个景点最受欢迎？")
+        self.assertContains(response, "main/admin_ai.css")
+        self.assertContains(response, "main/admin_ai.js")
+
     def test_conversation_detail_enforces_ownership(self):
         self.client.force_login(self.staff)
         own = self.client.get(
