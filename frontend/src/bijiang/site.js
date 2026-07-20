@@ -660,21 +660,27 @@ function stopLocalVoice() {
   state.localVoiceCurrentTime = 0;
 }
 
-localAudio.addEventListener("timeupdate", () => {
-  state.localVoiceCurrentTime = Number.isFinite(localAudio.currentTime) && localAudio.currentTime >= 0 ? localAudio.currentTime : 0;
-  const range = app.querySelector("[data-local-voice-range]");
-  if (range) range.value = String(localAudio.currentTime);
-});
-localAudio.addEventListener("ended", () => {
-  state.localVoicePlaying = false;
-  state.localVoiceCurrentTime = 0;
-  if (!destroyed && state.view === "stories") transition(render);
-});
-localAudio.addEventListener("error", () => {
-  state.localVoicePlaying = false;
-  showToast("播放失败，请稍后重试");
-  if (!destroyed && state.view === "stories") transition(render);
-});
+function bindLocalVoiceEvents(token, voiceId) {
+  const isCurrent = () => token === localVoiceRequestToken && state.activeLocalVoiceId === voiceId;
+  localAudio.addEventListener("timeupdate", () => {
+    if (!isCurrent()) return;
+    state.localVoiceCurrentTime = Number.isFinite(localAudio.currentTime) && localAudio.currentTime >= 0 ? localAudio.currentTime : 0;
+    const range = app.querySelector("[data-local-voice-range]");
+    if (range) range.value = String(state.localVoiceCurrentTime);
+  });
+  localAudio.addEventListener("ended", () => {
+    if (!isCurrent()) return;
+    state.localVoicePlaying = false;
+    state.localVoiceCurrentTime = 0;
+    if (!destroyed && state.view === "stories") transition(render);
+  });
+  localAudio.addEventListener("error", () => {
+    if (!isCurrent()) return;
+    state.localVoicePlaying = false;
+    showToast("播放失败，请稍后重试");
+    if (!destroyed && state.view === "stories") transition(render);
+  });
+}
 
 function render() {
   app.innerHTML = renders[state.view]();
@@ -1202,6 +1208,7 @@ const handleClick = (event) => {
         state.localVoicePlaying = false;
       } else {
         const token = ++localVoiceRequestToken;
+        bindLocalVoiceEvents(token, voiceId);
         state.localVoicePlaying = true;
         void localAudio.play().then(() => {
           if (token === localVoiceRequestToken && state.activeLocalVoiceId === voiceId) transition(render);
@@ -1219,6 +1226,7 @@ const handleClick = (event) => {
       state.localVoiceCurrentTime = 0;
       localAudio.src = voice.file_url;
       const token = ++localVoiceRequestToken;
+      bindLocalVoiceEvents(token, voiceId);
       state.localVoicePlaying = true;
       void localAudio.play().then(() => {
         if (token === localVoiceRequestToken && state.activeLocalVoiceId === voiceId) transition(render);

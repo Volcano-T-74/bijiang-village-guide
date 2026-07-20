@@ -564,4 +564,37 @@ describe('Bijiang village website', () => {
     window.dispatchEvent(new HashChangeEvent('hashchange'))
     expect(audio.pause).toHaveBeenCalled()
   })
+
+  it('ignores stale media events after switching local voices', async () => {
+    fetch.mockImplementation((url) => {
+      if (url === '/api/v1/sessions/') return jsonResponse({ id: 'session-1' }, 201)
+      if (url === '/api/v1/bootstrap/') return jsonResponse(bootstrap)
+      if (url === '/api/v1/local-voices/') return jsonResponse([
+        { id: 1, title: '声音甲', language_label: '当地讲述', file_url: '/a.m4a', duration_seconds: 20 },
+        { id: 2, title: '声音乙', language_label: '当地讲述', file_url: '/b.m4a', duration_seconds: 30 },
+      ])
+      return jsonResponse({ detail: 'not found' }, 404)
+    })
+    const handlers = {}
+    const audio = {
+      pause: vi.fn(), play: vi.fn(() => Promise.resolve()), currentTime: 0,
+      addEventListener: vi.fn((name, handler) => { (handlers[name] ||= []).push(handler) }),
+    }
+    vi.stubGlobal('Audio', vi.fn(function AudioMock() { return audio }))
+    history.replaceState({}, '', '/#stories')
+    const wrapper = mount(App, { attachTo: document.body })
+    await flushPromises()
+    await wrapper.get('[data-local-voice-id="1"]').trigger('click')
+    const stale = Object.fromEntries(Object.entries(handlers).map(([name, list]) => [name, list[0]]))
+    await wrapper.get('[data-local-voice-id="2"]').trigger('click')
+    await flushPromises()
+
+    audio.currentTime = 19
+    stale.timeupdate()
+    stale.ended()
+    stale.error()
+    expect(wrapper.get('[data-local-voice-id="2"]').attributes('aria-label')).toContain('暂停')
+    expect(wrapper.get('[data-local-voice-range="2"]').element.value).toBe('0')
+    expect(wrapper.find('[role="status"]').text()).not.toContain('播放失败')
+  })
 })
