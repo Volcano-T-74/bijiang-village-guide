@@ -15,7 +15,9 @@ class DeepSeekTimeoutError(Exception):
 
 
 class DeepSeekUpstreamError(Exception):
-    pass
+    def __init__(self, message, status_code=None):
+        super().__init__(message)
+        self.status_code = status_code
 
 
 class DeepSeekResponseError(Exception):
@@ -89,7 +91,7 @@ def analyze_visitor_metrics(question, metrics, history=None):
         raise DeepSeekTimeoutError("DeepSeek request timed out.") from exc
     except HTTPError as exc:
         raise DeepSeekUpstreamError(
-            f"DeepSeek returned HTTP status {exc.code}."
+            f"DeepSeek returned HTTP status {exc.code}.", status_code=exc.code
         ) from exc
     except URLError as exc:
         if isinstance(exc.reason, (socket.timeout, TimeoutError)):

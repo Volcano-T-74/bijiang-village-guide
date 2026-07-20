@@ -81,7 +81,7 @@ class AnalyticsConversationServiceTests(TestCase):
         cases = (
             (DeepSeekConfigurationError("secret config detail"), "configuration"),
             (DeepSeekTimeoutError("secret timeout detail"), "timeout"),
-            (DeepSeekUpstreamError("secret upstream detail"), "upstream"),
+            (DeepSeekUpstreamError("secret upstream detail"), "network"),
             (DeepSeekResponseError("secret response detail"), "response"),
         )
         for error, code in cases:
@@ -94,6 +94,22 @@ class AnalyticsConversationServiceTests(TestCase):
                 self.assertEqual(turn.error_code, code)
                 self.assertEqual(turn.answer, {})
                 self.assertNotIn("secret", str(turn.__dict__))
+
+    @patch("main.services.analytics_conversation.build_visitor_metrics", return_value=METRICS)
+    def test_classifies_safe_upstream_statuses(self, build_metrics):
+        cases = ((401, "authentication"), (403, "authentication"), (402, "balance"), (429, "rate_limit"), (500, "upstream"))
+        for status_code, expected in cases:
+            with self.subTest(status_code=status_code), patch(
+                "main.services.analytics_conversation.analyze_visitor_metrics",
+                side_effect=DeepSeekUpstreamError(
+                    "safe upstream failure", status_code=status_code
+                ),
+            ):
+                turn = ask_analytics_question(
+                    self.conversation, f"状态 {status_code}", 30
+                )
+                self.assertEqual(turn.status, AnalyticsTurn.Status.FAILED)
+                self.assertEqual(turn.error_code, expected)
 
     @patch("main.services.analytics_conversation.analyze_visitor_metrics", return_value=ANALYSIS)
     @patch("main.services.analytics_conversation.build_visitor_metrics", return_value=METRICS)

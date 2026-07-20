@@ -100,16 +100,21 @@ class DeepSeekClientTests(SimpleTestCase):
 
     @patch("main.services.deepseek_client.urlopen")
     def test_maps_http_error_without_exposing_response_body(self, mocked_urlopen):
-        mocked_urlopen.side_effect = HTTPError(
-            "https://api.deepseek.com/chat/completions",
-            401,
-            "Unauthorized",
-            {},
-            BytesIO(b"secret upstream body"),
-        )
-        with self.assertRaisesRegex(DeepSeekUpstreamError, "401") as raised:
-            analyze_visitor_metrics("问题", METRICS)
-        self.assertNotIn("secret upstream body", str(raised.exception))
+        for status_code in (401, 402, 429, 500):
+            with self.subTest(status_code=status_code):
+                mocked_urlopen.side_effect = HTTPError(
+                    "https://api.deepseek.com/chat/completions",
+                    status_code,
+                    "Upstream error",
+                    {},
+                    BytesIO(b"secret upstream body"),
+                )
+                with self.assertRaisesRegex(
+                    DeepSeekUpstreamError, str(status_code)
+                ) as raised:
+                    analyze_visitor_metrics("问题", METRICS)
+                self.assertEqual(raised.exception.status_code, status_code)
+                self.assertNotIn("secret upstream body", str(raised.exception))
 
     @patch("main.services.deepseek_client.urlopen")
     def test_rejects_invalid_or_incomplete_model_response(self, mocked_urlopen):

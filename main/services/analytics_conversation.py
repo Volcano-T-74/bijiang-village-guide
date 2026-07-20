@@ -12,12 +12,30 @@ from main.services.deepseek_client import (
 from main.services.visitor_analytics import build_visitor_metrics
 
 
-ERROR_CODES = {
-    DeepSeekConfigurationError: "configuration",
-    DeepSeekTimeoutError: "timeout",
-    DeepSeekUpstreamError: "upstream",
-    DeepSeekResponseError: "response",
-}
+KNOWN_ERRORS = (
+    DeepSeekConfigurationError,
+    DeepSeekTimeoutError,
+    DeepSeekUpstreamError,
+    DeepSeekResponseError,
+)
+
+
+def _error_code(exc):
+    if isinstance(exc, DeepSeekConfigurationError):
+        return "configuration"
+    if isinstance(exc, DeepSeekTimeoutError):
+        return "timeout"
+    if isinstance(exc, DeepSeekResponseError):
+        return "response"
+    if exc.status_code in (401, 403):
+        return "authentication"
+    if exc.status_code == 402:
+        return "balance"
+    if exc.status_code == 429:
+        return "rate_limit"
+    if exc.status_code is None:
+        return "network"
+    return "upstream"
 
 
 def _completed_history(conversation):
@@ -43,10 +61,10 @@ def _run_turn(turn):
             metrics,
             history=_completed_history(turn.conversation),
         )
-    except tuple(ERROR_CODES) as exc:
+    except KNOWN_ERRORS as exc:
         turn.status = AnalyticsTurn.Status.FAILED
         turn.answer = {}
-        turn.error_code = ERROR_CODES[type(exc)]
+        turn.error_code = _error_code(exc)
         turn.answered_at = timezone.now()
         turn.save(
             update_fields=("status", "answer", "error_code", "answered_at")
