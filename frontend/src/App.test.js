@@ -62,6 +62,17 @@ describe('Bijiang village website', () => {
       vi.fn((url) => {
         if (url === '/api/v1/sessions/') return jsonResponse({ id: 'session-1' }, 201)
         if (url === '/api/v1/bootstrap/') return jsonResponse(bootstrap)
+        if (url === '/api/v1/local-voices/') return jsonResponse([
+          {
+            id: 1,
+            title: '顺德碧江村介绍（普通话）',
+            original_file_name: '国语版 顺德碧江村介绍.m4a',
+            file_url: '/static/audio/国语版%20顺德碧江村介绍.m4a',
+            duration_seconds: 88,
+            language: 'zh-CN',
+            language_label: '普通话',
+          },
+        ])
         if (url === '/api/v1/itineraries/generate/') return jsonResponse(route, 201)
         if (url === '/api/v1/events/') return jsonResponse({ id: 1 }, 201)
         if (url === '/api/v1/attractions/village-history-museum/') {
@@ -499,5 +510,25 @@ describe('Bijiang village website', () => {
     const stopNames = wrapper.findAll('.route-stop strong').map(item => item.text())
     expect(stopNames).toContain('古桥')
     expect(stopNames).not.toEqual(expect.arrayContaining(['村史馆', '碧溪书公祠']))
+  })
+
+  it('renders local voices on the stories page', async () => {
+    history.replaceState({}, '', '/#stories')
+    const wrapper = mount(App, { attachTo: document.body })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('当地声音')
+    expect(wrapper.text()).toContain('顺德碧江村介绍（普通话）')
+    expect(wrapper.get('[data-local-voice-id="1"]').attributes('aria-label')).toContain('播放')
+  })
+
+  it('switches local voice playback and pauses the previous recording', async () => {
+    const first = { pause: vi.fn(), play: vi.fn(() => Promise.resolve()), addEventListener: vi.fn() }
+    vi.stubGlobal('Audio', vi.fn(function AudioMock() { return first }))
+    history.replaceState({}, '', '/#stories')
+    const wrapper = mount(App, { attachTo: document.body })
+    await flushPromises()
+    await wrapper.get('[data-local-voice-id="1"]').trigger('click')
+    expect(first.play).toHaveBeenCalled()
   })
 })

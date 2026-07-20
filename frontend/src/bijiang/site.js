@@ -267,6 +267,9 @@ function renderStories() {
     </section>
 
     <section class="recommended reveal">${sectionTitle("今日推荐故事", `<button data-action="toast" data-message="更多故事正在整理中">查看全部 ${icon("arrow")}</button>`)}<article><img src="${bridgeStoryImg}" alt="一座古桥，连起几代人的时光" /><div><small>精选故事</small><h3>一座古桥，连起几代人的时光</h3><p>古桥静卧碧波之上，见证了船来人往，也见证了家族的团圆与离别。</p><span>${icon("clock")} 8 分钟阅读　|　${icon("pin")} 古桥</span></div><button class="round-button" data-action="toast" data-message="故事阅读模式即将开放" aria-label="阅读推荐故事">${icon("arrow")}</button></article></section>
+    <section class="local-voices-section reveal"><div class="section-heading"><h2>当地声音</h2></div>
+      ${state.localVoicesLoading ? `<p class="local-voices-status">正在加载当地声音…</p>` : state.localVoicesError ? `<p class="local-voices-status">${state.localVoicesError}</p>` : !state.localVoices.length ? `<p class="local-voices-status">暂无当地声音</p>` : `<div class="local-voice-list">${state.localVoices.map(voice => `<article class="local-voice-item"><button class="local-voice-play" data-local-voice-id="${voice.id}" aria-label="${state.activeLocalVoiceId === voice.id && state.localVoicePlaying ? "暂停" : "播放"}${voice.title}">${icon(state.activeLocalVoiceId === voice.id && state.localVoicePlaying ? "pause" : "play")}</button><div class="local-voice-copy"><strong>${voice.title}</strong><small>${voice.language_label}</small></div><span class="local-voice-duration">${formatTime(voice.duration_seconds)}</span>${state.activeLocalVoiceId === voice.id ? `<input class="local-voice-progress" data-local-voice-range="${voice.id}" type="range" min="0" max="${voice.duration_seconds}" value="${state.localVoiceCurrentTime}" aria-label="调整${voice.title}播放进度" />` : ""}</article>`).join("")}</div>`}
+    </section>
   `);
 }
 
@@ -645,6 +648,31 @@ const renders = { home: renderHome, stamps: renderStamps, stories: renderStories
 let toastTimer;
 let audioTimer;
 let destroyed = false;
+const localAudio = new Audio();
+
+function stopLocalVoice() {
+  localAudio.pause();
+  localAudio.currentTime = 0;
+  state.activeLocalVoiceId = null;
+  state.localVoicePlaying = false;
+  state.localVoiceCurrentTime = 0;
+}
+
+localAudio.addEventListener("timeupdate", () => {
+  state.localVoiceCurrentTime = localAudio.currentTime;
+  const range = app.querySelector("[data-local-voice-range]");
+  if (range) range.value = String(localAudio.currentTime);
+});
+localAudio.addEventListener("ended", () => {
+  state.localVoicePlaying = false;
+  state.localVoiceCurrentTime = 0;
+  if (!destroyed && state.view === "stories") transition(render);
+});
+localAudio.addEventListener("error", () => {
+  state.localVoicePlaying = false;
+  showToast("播放失败，请稍后重试");
+  if (!destroyed && state.view === "stories") transition(render);
+});
 
 function render() {
   app.innerHTML = renders[state.view]();
@@ -675,6 +703,7 @@ function transition(update) {
 
 function navigate(view, replace = false) {
   if (!validViews.has(view) || view === state.view) return;
+  if (state.view === "stories" && view !== "stories") stopLocalVoice();
   state.view = view;
   history[replace ? "replaceState" : "pushState"]({ view }, "", `#${view}`);
   transition(() => { render(); scrollTo({ top: 0, behavior: "instant" }); });
@@ -1159,6 +1188,26 @@ const handleClick = (event) => {
     return;
   }
   if (button.dataset.attractionSlug) { void openAttraction(button.dataset.attractionSlug); return; }
+  if (button.dataset.localVoiceId) {
+    const voice = state.localVoices.find(item => String(item.id) === button.dataset.localVoiceId);
+    if (!voice) return;
+    if (state.activeLocalVoiceId === voice.id) {
+      if (state.localVoicePlaying) {
+        localAudio.pause();
+        state.localVoicePlaying = false;
+      } else {
+        void localAudio.play().then(() => { state.localVoicePlaying = true; }).catch(() => showToast("播放失败，请稍后重试"));
+      }
+    } else {
+      localAudio.pause();
+      state.activeLocalVoiceId = voice.id;
+      state.localVoiceCurrentTime = 0;
+      localAudio.src = voice.file_url;
+      void localAudio.play().then(() => { state.localVoicePlaying = true; }).catch(() => showToast("播放失败，请稍后重试"));
+    }
+    transition(render);
+    return;
+  }
   if (button.dataset.interest) {
     state.interests.has(button.dataset.interest) ? state.interests.delete(button.dataset.interest) : state.interests.add(button.dataset.interest);
     persistDemoState(); transition(render); return;
@@ -1217,6 +1266,10 @@ const handleClick = (event) => {
 
 const handleInput = (event) => {
   if (event.target.matches("[data-audio-range]")) state.audioProgress = Number(event.target.value);
+  if (event.target.matches("[data-local-voice-range]")) {
+    localAudio.currentTime = Number(event.target.value);
+    state.localVoiceCurrentTime = localAudio.currentTime;
+  }
 };
 
 const handleKeydown = (event) => {
@@ -1255,6 +1308,7 @@ void initializeLocalVoices();
 
 return () => {
   destroyed = true;
+  stopLocalVoice();
   clearTimeout(toastTimer);
   clearInterval(audioTimer);
   app.removeEventListener("click", handleClick);
