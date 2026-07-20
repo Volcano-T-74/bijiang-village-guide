@@ -42,15 +42,7 @@ const moduleIconUrls = {
   "module-stamp": new URL('./assets/module-stamp.webp', import.meta.url).href,
   "module-story": new URL('./assets/module-story.webp', import.meta.url).href,
 };
-const profileAvatarImg = new URL('./assets/游客.webp', import.meta.url).href;
-const profileBgImg = new URL('./assets/游客背景图.webp', import.meta.url).href;
-const footprintIconImg = new URL('./assets/足迹.webp', import.meta.url).href;
-const footprintBgImg = new URL('./assets/足迹背景图.webp', import.meta.url).href;
-const storyIconImg = new URL('./assets/收藏故事.webp', import.meta.url).href;
-const collectStoryBgImg = new URL('./assets/收藏故事背景图.webp', import.meta.url).href;
 const deviceIconImg = new URL('./assets/设备管理.webp', import.meta.url).href;
-const historyIconImg = new URL('./assets/历史路线.webp', import.meta.url).href;
-const historyBgImg = new URL('./assets/历史路线背景图.webp', import.meta.url).href;
 
 const interestBgImg = new URL('./assets/兴趣路线背景图.webp', import.meta.url).href;
 const routePreviewImg = new URL('./assets/路线预览.webp', import.meta.url).href;
@@ -79,14 +71,61 @@ let interests = [];
 let places = [];
 
 const DEMO_STORAGE_KEY = 'bijiang_indoor_demo_state';
-const DEMO_STORAGE_VERSION = 2;
+const DEMO_STORAGE_VERSION = 3;
+
+function routeMetrics(route = {}) {
+  const stops = Array.isArray(route.stops) ? route.stops : [];
+  const legs = Array.isArray(route.legs) ? route.legs : [];
+  const narrationMinutes = stops.reduce(
+    (sum, stop) => sum + Number(stop.visit_minutes || 0),
+    0,
+  );
+  const walkingMinutes = legs.reduce((sum, leg) => {
+    const estimatedMinutes = Number(leg.estimated_minutes);
+    if (estimatedMinutes > 0) return sum + estimatedMinutes;
+    const distance = Number(leg.distance_meters || 0);
+    return sum + (distance > 0 ? Math.max(1, Math.ceil(distance / 75)) : 0);
+  }, 0);
+  const distanceMeters = legs.reduce(
+    (sum, leg) => sum + Number(leg.distance_meters || 0),
+    0,
+  );
+  return {
+    narrationMinutes,
+    walkingMinutes,
+    distanceMeters,
+    totalMinutes: narrationMinutes + walkingMinutes,
+  };
+}
+
+function createRouteSnapshot(route, mode = "relaxed", generatedAt = new Date().toISOString()) {
+  const stops = (route?.stops || []).map(stop => ({ slug: stop.slug, name: stop.name }));
+  if (!stops.length) return null;
+  return {
+    signature: stops.map(stop => stop.slug).join(">"),
+    generatedAt,
+    mode: route.mode || mode,
+    ...routeMetrics(route),
+    stops,
+  };
+}
 
 function readDemoState() {
   try {
     const saved = JSON.parse(localStorage.getItem(DEMO_STORAGE_KEY) || '{}');
-    return saved.version === DEMO_STORAGE_VERSION
-      ? saved
-      : { ...saved, route: null };
+    if (saved.version === DEMO_STORAGE_VERSION) return saved;
+    const migratedRoute = saved.version === 2 && saved.route?.stops?.length
+      ? saved.route
+      : null;
+    const migratedHistory = migratedRoute
+      ? [createRouteSnapshot(migratedRoute, saved.mode)].filter(Boolean)
+      : [];
+    return {
+      ...saved,
+      version: DEMO_STORAGE_VERSION,
+      route: migratedRoute,
+      routeHistory: migratedHistory,
+    };
   } catch {
     return {};
   }
@@ -100,6 +139,9 @@ const state = {
   duration: savedDemoState.duration || 60,
   mode: savedDemoState.mode || "relaxed",
   route: savedDemoState.route || null,
+  routeHistory: Array.isArray(savedDemoState.routeHistory)
+    ? savedDemoState.routeHistory.slice(0, 5)
+    : [],
   generating: false,
   pendingArrival: null,
   unlockedStampSlug: null,
@@ -129,9 +171,19 @@ function persistDemoState() {
     duration: state.duration,
     mode: state.mode,
     route: state.route,
+    routeHistory: state.routeHistory,
     currentSimulatedSlug: state.currentSimulatedSlug,
     visitedSlugs: Array.from(state.visitedSlugs),
   }));
+}
+
+function rememberRoute(route) {
+  const snapshot = createRouteSnapshot(route, state.mode);
+  if (!snapshot) return;
+  state.routeHistory = [
+    snapshot,
+    ...state.routeHistory.filter(item => item.signature !== snapshot.signature),
+  ].slice(0, 5);
 }
 
 const validViews = new Set(["home", "stamps", "stories", "profile", "interests", "route", "attraction", "ancestral", "overview", "clan", "waterside", "poetry"]);
@@ -280,91 +332,62 @@ function renderStories() {
 }
 
 function renderProfile() {
-  const items = [
-  ["我的足迹", "记录你在碧江村的探索轨迹", "已探索 8 个地点", footprintIconImg, footprintBgImg, "足迹", "查看完整足迹"],
-  ["已收藏故事", "你收藏的声音与故事", "共 5 个故事", storyIconImg, collectStoryBgImg, "收藏故事", null], // 改这里
-  ["历史路线", "回顾你走过的探索路线", "共 3 条路线", historyIconImg, historyBgImg, "历史路线", null],
-];
+  const visitedPlaces = Array.from(state.visitedSlugs)
+    .map(slug => places.find(place => place.slug === slug))
+    .filter(Boolean);
+  const history = state.routeHistory;
+  const footprintContent = visitedPlaces.length
+    ? `<ol class="profile-footprint-list">${visitedPlaces.map((place, index) => `
+        <li class="profile-footprint-item">
+          <span class="profile-step">${index + 1}</span>
+          <img src="${escapeHtml(placeImgUrls[place.slug] || place.cover_image_url || "")}" alt="" />
+          <span><strong>${escapeHtml(place.name)}</strong><small>${escapeHtml(place.zone?.name || "碧江村")} · 邮章已点亮</small></span>
+          ${icon("check")}
+        </li>`).join("")}</ol>`
+    : `<div class="profile-empty">${icon("pin")}<strong>还没有足迹</strong><p>在“我的路线”地图中模拟到达景点后，这里会按顺序记录。</p></div>`;
+  const historyContent = history.length
+    ? `<div class="profile-history-list">${history.map(item => `
+        <article class="profile-history-item">
+          <header><span>${item.mode === "deep" ? "深度走读" : "轻松逛"}</span><time datetime="${escapeHtml(item.generatedAt)}">${formatHistoryDate(item.generatedAt)}</time></header>
+          <strong>${item.stops.map(stop => escapeHtml(stop.name)).join(" → ")}</strong>
+          <div><span>${icon("clock")} ${Number(item.totalMinutes || 0)}分钟</span><span>${icon("walk")} ${Number(item.distanceMeters || 0)}米</span><span>${item.stops.length}个景点</span></div>
+        </article>`).join("")}</div>`
+    : `<div class="profile-empty">${icon("route")}<strong>还没有历史路线</strong><p>完成一次兴趣路线生成后，最近 5 条路线会保存在这里。</p></div>`;
+
   return shell(`
-    <header class="simple-header reveal"><h1>我的</h1></header>
-    
-    <!-- ========== 顶部：游客卡片 ========== -->
-    <section class="profile-card reveal" style="position:relative; overflow:hidden; min-height:200px; padding:34px; border-radius:28px; background:#edf3f5; border:1px solid #d8dde0;">
-      <div style="position:relative; z-index:2; display:flex; align-items:center; gap:28px;">
-        <div style="display:grid; place-items:center; width:112px; aspect-ratio:1; border-radius:50%; border:7px solid rgba(255,255,255,0.7); background:#dce7ec; overflow:hidden;">
-          <img src="${profileAvatarImg}" alt="游客" style="width:100%; height:100%; object-fit:cover;" />
-        </div>
-        <div>
-          <h2 style="margin:0; font:700 36px var(--serif);">游客</h2>
-          <p style="margin-bottom:0; color:var(--muted);">今日正在探索碧江村</p>
-        </div>
+    <header class="simple-header profile-heading reveal">
+      <div><h1>我的</h1><p>足迹、路线与随身设备</p></div>
+      <strong>${visitedPlaces.length}<small> / ${places.length || 9} 枚邮章</small></strong>
+    </header>
+    <div class="profile-dashboard">
+      <section class="profile-section reveal" aria-labelledby="profile-footprints-title">
+        <div class="profile-section-heading"><div>${icon("pin")}<span><h2 id="profile-footprints-title">我的足迹</h2><p>按模拟到达顺序记录</p></span></div><strong>${visitedPlaces.length}</strong></div>
+        ${footprintContent}
+      </section>
+      <section class="profile-section reveal" aria-labelledby="profile-history-title">
+        <div class="profile-section-heading"><div>${icon("route")}<span><h2 id="profile-history-title">历史路线</h2><p>最近生成的 5 条路线</p></span></div><strong>${history.length}</strong></div>
+        ${historyContent}
+      </section>
+    </div>
+    <section class="device-card profile-device reveal" aria-labelledby="profile-device-title">
+      <div class="profile-section-heading"><div><img src="${deviceIconImg}" alt="" /><span><h2 id="profile-device-title">设备管理</h2><p>碧江寻声 · 挂件</p></span></div><span class="device-status">已连接</span></div>
+      <div class="device-body">
+        <div class="pendant small"><span>碧江</span></div>
+        <div><h3>挂件状态</h3><p class="connected">电量 82% · 骨传导模式开启</p><button data-action="toast" data-message="挂件使用指引即将开放">归还挂件指引 ${icon("arrow")}</button></div>
       </div>
-      <img src="${profileBgImg}" alt="" style="position:absolute; inset:0 0 0 42%; width:58%; height:100%; object-fit:cover; opacity:0.45; mask-image:linear-gradient(90deg, transparent, #000 40%);" />
-    </section>
-    
-    <!-- ========== 我的足迹 + 已收藏故事 ========== -->
-    <section class="profile-list reveal">
-      ${items.slice(0, 2).map(([title, copy, meta, iconImg, bgImg, alt, extra]) => `
-        <button class="profile-item" data-action="toast" data-message="${title}详情即将开放" style="position:relative; overflow:hidden; padding:24px 30px; min-height:150px; border-radius:24px; border:1px solid var(--line); background:rgb(255 252 246 / 82%); cursor:pointer; display:grid; grid-template-columns:auto 1fr auto; gap:22px; align-items:center; text-align:left;">
-          <span class="profile-icon" style="display:grid; place-items:center; width:74px; height:74px; border-radius:50%; background:#f0ebdf; overflow:hidden; flex-shrink:0; position:relative; z-index:2;">
-            <img src="${iconImg}" alt="${alt}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" />
-          </span>
-          <div style="position:relative; z-index:2;">
-            <strong style="font:700 27px var(--serif); display:block;">${title}</strong>
-            <p style="margin:7px 0 5px; color:var(--muted);">${copy}</p>
-            ${extra ? `<small style="display:block; color:var(--gold-dark); font-weight:500; margin-bottom:6px;">${extra}</small>` : ''}
-            <small style="padding:5px 13px; color:var(--blue); border-radius:999px; background:#e8f0f4;">${meta}</small>
-          </div>
-          <span style="position:relative; z-index:2; color:#958b7e;">${icon("arrow", "card-arrow")}</span>
-          <img src="${bgImg}" alt="" style="position:absolute; inset:0 0 0 55%; width:55%; height:100%; object-fit:cover; opacity:0.3; mask-image:linear-gradient(90deg, transparent, #000 30%);" />
-        </button>
-      `).join("")}
-    </section>
-    
-    <!-- ========== 设备管理 ========== -->
-    <section class="device-card reveal" style="padding:28px; border:1px solid var(--line); border-radius:24px; background:#fffaf4; position:relative; overflow:hidden;">
-      <div style="position:relative; z-index:2; display:flex; align-items:center; gap:16px; margin-bottom:16px;">
-        <div style="display:grid; place-items:center; width:48px; height:48px; border-radius:14px; background:#eee7d8; overflow:hidden; flex-shrink:0;">
-          <img src="${deviceIconImg}" alt="设备管理" style="width:100%; height:100%; object-fit:cover;" />
-        </div>
-        <h2 style="margin:0; font:700 27px var(--serif);">设备管理</h2>
-      </div>
-      <div class="device-body" style="display:grid; grid-template-columns:auto 1fr; gap:42px; align-items:center; position:relative; z-index:2;">
-        <div class="pendant small" style="display:grid; place-items:center; width:100px; aspect-ratio:1; border:9px double #bdb3a3; border-radius:50%; background:linear-gradient(145deg, #f0eee7, #b6b3aa); box-shadow:0 12px 18px rgba(37,43,44,0.2); margin:0;">
-          <span style="font:700 20px var(--serif);">碧江</span>
-        </div>
-        <div>
-          <h3 style="margin:0 0 12px; font:700 24px var(--serif);">碧江寻声 · 挂件</h3>
-          <p class="connected" style="padding:15px; color:#567b50; border:1px solid #d9d3c9; border-radius:16px;">已连接　电量82%　骨传导模式开启</p>
-          <button data-action="toast" data-message="挂件使用指引即将开放" style="display:flex; align-items:center; justify-content:space-between; width:100%; padding:13px 18px; border:0; border-radius:14px; background:#eee8dc; cursor:pointer; font:inherit; color:inherit;">
-            归还挂件指引 ${icon("arrow")}
-          </button>
-        </div>
-      </div>
-    </section>
-    
-    <!-- ========== 历史路线 ========== -->
-    <section class="profile-list reveal">
-      ${(() => {
-        const [title, copy, meta, iconImg, bgImg, alt, extra] = items[2];
-        return `
-          <button class="profile-item" data-action="toast" data-message="${title}详情即将开放" style="position:relative; overflow:hidden; padding:24px 30px; min-height:150px; border-radius:24px; border:1px solid var(--line); background:rgb(255 252 246 / 82%); cursor:pointer; display:grid; grid-template-columns:auto 1fr auto; gap:22px; align-items:center; text-align:left;">
-            <span class="profile-icon" style="display:grid; place-items:center; width:74px; height:74px; border-radius:50%; background:#f0ebdf; overflow:hidden; flex-shrink:0; position:relative; z-index:2;">
-              <img src="${iconImg}" alt="${alt}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" />
-            </span>
-            <div style="position:relative; z-index:2;">
-              <strong style="font:700 27px var(--serif); display:block;">${title}</strong>
-              <p style="margin:7px 0 5px; color:var(--muted);">${copy}</p>
-              ${extra ? `<small style="display:block; color:var(--gold-dark); font-weight:500; margin-bottom:6px;">${extra}</small>` : ''}
-              <small style="padding:5px 13px; color:var(--blue); border-radius:999px; background:#e8f0f4;">${meta}</small>
-            </div>
-            <span style="position:relative; z-index:2; color:#958b7e;">${icon("arrow", "card-arrow")}</span>
-            <img src="${bgImg}" alt="" style="position:absolute; inset:0 0 0 55%; width:55%; height:100%; object-fit:cover; opacity:0.3; mask-image:linear-gradient(90deg, transparent, #000 30%);" />
-          </button>
-        `;
-      })()}
     </section>
   `);
+}
+
+function formatHistoryDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "最近生成";
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 }
 
 function profileItem(title, copy, meta, ico) {
@@ -435,24 +458,12 @@ function renderRoute() {
     `, { back: true, nav: false, className: "subpage route-view" });
   }
   const route = state.route;
-  const narrationMinutes = route.stops.reduce(
-    (sum, stop) => sum + Number(stop.visit_minutes || 0),
-    0,
-  );
-  const walkingMinutes = route.legs.reduce(
-    (sum, leg) => {
-      const estimatedMinutes = Number(leg.estimated_minutes);
-      if (estimatedMinutes > 0) return sum + estimatedMinutes;
-      const distance = Number(leg.distance_meters || 0);
-      return sum + (distance > 0 ? Math.max(1, Math.ceil(distance / 75)) : 0);
-    },
-    0,
-  );
-  const walkingDistance = route.legs.reduce(
-    (sum, leg) => sum + Number(leg.distance_meters || 0),
-    0,
-  );
-  const totalMinutes = narrationMinutes + walkingMinutes;
+  const {
+    narrationMinutes,
+    walkingMinutes,
+    distanceMeters: walkingDistance,
+    totalMinutes,
+  } = routeMetrics(route);
   const line = route.stops.map((stop, index) => `${index === 0 ? "M" : "L"}${stop.map_position.x} ${stop.map_position.y}`).join(" ");
   const modeLabel = route.mode === "deep" ? "深度走读" : "轻松逛";
   const routeIndex = new Map(route.stops.map((stop, index) => [stop.slug, index + 1]));
@@ -1083,6 +1094,7 @@ async function createRoute() {
 
   // 无论真实请求还是本地生成成功，都保存并跳转
   if (state.route?.stops?.length) {
+    rememberRoute(state.route);
     persistDemoState();
     navigate("route");
   } else {

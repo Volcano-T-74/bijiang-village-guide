@@ -2,6 +2,8 @@
 
 import { mount, flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import App from './App.vue'
 
 
@@ -101,6 +103,85 @@ describe('Bijiang village website', () => {
     const sources = wrapper.findAll('.interest-card img').map(image => image.attributes('src'))
     expect(sources.length).toBeGreaterThan(0)
     expect(sources.every(source => source && source !== 'undefined')).toBe(true)
+  })
+
+  it('renders footprint and route history details inline on the profile page', async () => {
+    localStorage.setItem('bijiang_indoor_demo_state', JSON.stringify({
+      version: 3,
+      interests: ['岭南建筑'],
+      duration: 60,
+      mode: 'relaxed',
+      route: null,
+      currentSimulatedSlug: 'village-history-museum',
+      visitedSlugs: ['village-history-museum'],
+      routeHistory: [{
+        signature: 'village-history-museum',
+        generatedAt: '2026-07-21T00:00:00.000Z',
+        mode: 'relaxed',
+        totalMinutes: 30,
+        walkingMinutes: 4,
+        distanceMeters: 280,
+        stops: [{ slug: 'village-history-museum', name: '村史馆' }],
+      }],
+    }))
+    history.replaceState({}, '', '/#profile')
+
+    const wrapper = mount(App, { attachTo: document.body })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('我的足迹')
+    expect(wrapper.text()).toContain('历史路线')
+    expect(wrapper.text()).toContain('设备管理')
+    expect(wrapper.text()).toContain('村史馆')
+    expect(wrapper.text()).toContain('280米')
+    expect(wrapper.text()).not.toContain('已收藏故事')
+    expect(wrapper.findAll('.profile-footprint-item')).toHaveLength(1)
+    expect(wrapper.findAll('.profile-history-item')).toHaveLength(1)
+  })
+
+  it('keeps only five unique route history entries with the newest first', async () => {
+    let itineraryNumber = 0
+    const fetch = vi.fn((url) => {
+      if (url === '/api/v1/sessions/') return jsonResponse({ id: 'session-1' }, 201)
+      if (url === '/api/v1/bootstrap/') return jsonResponse(bootstrap)
+      if (url === '/api/v1/local-voices/') return jsonResponse([])
+      if (url === '/api/v1/events/') return jsonResponse({ id: 1 }, 201)
+      if (url === '/api/v1/itineraries/generate/') {
+        itineraryNumber += 1
+        const slug = itineraryNumber === 6 ? 'route-1' : `route-${itineraryNumber}`
+        return jsonResponse({
+          ...route,
+          id: itineraryNumber,
+          stops: [{ ...route.stops[0], slug, name: `路线景点${itineraryNumber}` }],
+        }, 201)
+      }
+      return jsonResponse({ detail: 'not found' }, 404)
+    })
+    vi.stubGlobal('fetch', fetch)
+
+    const wrapper = mount(App, { attachTo: document.body })
+    await flushPromises()
+
+    for (let index = 0; index < 6; index += 1) {
+      location.hash = '#interests'
+      window.dispatchEvent(new HashChangeEvent('hashchange'))
+      await wrapper.get('[data-action="generate-route"]').trigger('click')
+      await flushPromises()
+    }
+
+    const saved = JSON.parse(localStorage.getItem('bijiang_indoor_demo_state'))
+    expect(saved.routeHistory).toHaveLength(5)
+    expect(saved.routeHistory.map(item => item.signature)).toEqual([
+      'route-1', 'route-5', 'route-4', 'route-3', 'route-2',
+    ])
+  })
+
+  it('keeps profile content inside a narrow mobile viewport', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/bijiang/site.css'), 'utf8')
+
+    expect(css).toMatch(/\.profile-empty p\s*\{[^}]*white-space:\s*normal/)
+    expect(css).toMatch(/@media \(max-width: 480px\)[\s\S]*?\.profile-heading\s*\{[^}]*flex-wrap:\s*wrap/)
+    expect(css).toMatch(/@media \(max-width: 480px\)[\s\S]*?\.device-body\s*\{[^}]*grid-template-columns:\s*1fr/)
   })
 
   it('renders route attraction introductions without detail links', async () => {
