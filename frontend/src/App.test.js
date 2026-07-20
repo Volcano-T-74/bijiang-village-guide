@@ -245,6 +245,26 @@ describe('Bijiang village website', () => {
     expect(wrapper.find('[data-map-slug="village-history-museum"].is-visited').exists()).toBe(true)
   })
 
+  it('restores unlocked stamps without replaying the celebration after refresh', async () => {
+    localStorage.setItem('bijiang_indoor_demo_state', JSON.stringify({
+      version: 2,
+      interests: ['岭南建筑'],
+      duration: 60,
+      mode: 'relaxed',
+      route,
+      currentSimulatedSlug: 'village-history-museum',
+      visitedSlugs: ['village-history-museum'],
+    }))
+    history.replaceState({}, '', '/#stamps')
+
+    const wrapper = mount(App, { attachTo: document.body })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('已点亮 1 / 1 个印章点')
+    expect(wrapper.findAll('.stamp-card.is-lit')).toHaveLength(1)
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+  })
+
   it('drops an old saved route but preserves simulated progress', async () => {
     localStorage.setItem('bijiang_indoor_demo_state', JSON.stringify({
       interests: ['岭南建筑'],
