@@ -1,5 +1,7 @@
+from pathlib import Path
 from urllib.parse import quote
 
+from django.conf import settings
 from django.core.management import call_command
 from django.test import TestCase
 
@@ -27,3 +29,6 @@ class LocalVoiceImportTests(TestCase):
                 self.assertEqual(voice.language, language)
                 self.assertEqual(voice.language_label, language_label)
                 self.assertEqual(voice.file_url, f"/static/audio/{quote(file_name)}")
+                asset_path = Path(settings.BASE_DIR) / "frontend" / "public" / "audio" / file_name
+                self.assertTrue(asset_path.is_file())
+                self.assertGreater(asset_path.stat().st_size, 0)
