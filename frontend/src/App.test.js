@@ -99,6 +99,53 @@ describe('Bijiang village website', () => {
     expect(wrapper.find('.route-stop .card-arrow').exists()).toBe(false)
   })
 
+  it('shows consistent total, narration, walking time and distance', async () => {
+    const secondPlace = {
+      ...bootstrap.attractions[0],
+      id: 2,
+      name: '古桥',
+      slug: 'ancient-bridge',
+      map_position: { x: 50, y: 45 },
+    }
+    const twoStopRoute = {
+      ...route,
+      total_estimated_minutes: 999,
+      attraction_sequence: [1, 2],
+      stops: [
+        route.stops[0],
+        {
+          ...secondPlace,
+          visit_minutes: 6,
+          recommendation: '匹配兴趣：自然水岸',
+          zone: { id: 2, name: '古圩水运区' },
+        },
+      ],
+      legs: [{
+        estimated_minutes: 4,
+        distance_meters: 180,
+        narrative_bridge: '沿河前往古桥。',
+      }],
+    }
+    fetch.mockImplementation((url) => {
+      if (url === '/api/v1/sessions/') return jsonResponse({ id: 'session-1' }, 201)
+      if (url === '/api/v1/bootstrap/') return jsonResponse({ ...bootstrap, attractions: [bootstrap.attractions[0], secondPlace] })
+      if (url === '/api/v1/itineraries/generate/') return jsonResponse(twoStopRoute, 201)
+      return jsonResponse({ detail: 'not found' }, 404)
+    })
+    const wrapper = mount(App, { attachTo: document.body })
+    await flushPromises()
+    await wrapper.get('[data-route="interests"]').trigger('click')
+    await wrapper.get('[data-action="generate-route"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('总时长 20分钟')
+    expect(wrapper.text()).toContain('讲解 16分钟')
+    expect(wrapper.text()).toContain('步行 4分钟')
+    expect(wrapper.text()).toContain('180米')
+    expect(wrapper.text()).toContain('10分钟讲解')
+    expect(wrapper.text()).toContain('6分钟讲解')
+  })
+
   it('starts every stamp locked and derives progress from visited places', async () => {
     history.replaceState({}, '', '/#stamps')
     const wrapper = mount(App, { attachTo: document.body })
@@ -363,6 +410,12 @@ describe('Bijiang village website', () => {
     expect(stopNames[1]).toBe('古桥')
     expect(stopNames).not.toContain('黄氏宗祠')
     expect(stopNames).not.toEqual(expect.arrayContaining(['碧溪书公祠', '诗词巷']))
+    const narrationMinutes = wrapper.findAll('.route-stop small')
+      .map(item => Number(item.text().match(/(\d+)分钟讲解/)?.[1] || 0))
+      .reduce((sum, minutes) => sum + minutes, 0)
+    const totalMinutes = Number(wrapper.text().match(/总时长 (\d+)分钟/)?.[1] || 0)
+    const walkingMinutes = Number(wrapper.text().match(/步行 (\d+)分钟/)?.[1] || 0)
+    expect(totalMinutes).toBe(narrationMinutes + walkingMinutes)
     expect(
       wrapper.findAll('.map-marker.is-route').map(item => item.text()),
     ).toEqual(stopNames.map((_, index) => String(index + 1)))

@@ -3,6 +3,7 @@ import {
   generateItinerary,
   getAttraction,
   getBootstrap,
+  getLocalVoices,
   recordEvent,
   recordFavorite,
   recordFootprint,
@@ -105,6 +106,12 @@ const state = {
   attractionDetail: null,
   detailLoading: false,
   bootstrapReady: false,
+  localVoices: [],
+  localVoicesLoading: true,
+  localVoicesError: "",
+  activeLocalVoiceId: null,
+  localVoicePlaying: false,
+  localVoiceCurrentTime: 0,
   audioPlaying: false,
   audioProgress: 28,
 };
@@ -419,6 +426,24 @@ function renderRoute() {
     `, { back: true, nav: false, className: "subpage route-view" });
   }
   const route = state.route;
+  const narrationMinutes = route.stops.reduce(
+    (sum, stop) => sum + Number(stop.visit_minutes || 0),
+    0,
+  );
+  const walkingMinutes = route.legs.reduce(
+    (sum, leg) => {
+      const estimatedMinutes = Number(leg.estimated_minutes);
+      if (estimatedMinutes > 0) return sum + estimatedMinutes;
+      const distance = Number(leg.distance_meters || 0);
+      return sum + (distance > 0 ? Math.max(1, Math.ceil(distance / 75)) : 0);
+    },
+    0,
+  );
+  const walkingDistance = route.legs.reduce(
+    (sum, leg) => sum + Number(leg.distance_meters || 0),
+    0,
+  );
+  const totalMinutes = narrationMinutes + walkingMinutes;
   const line = route.stops.map((stop, index) => `${index === 0 ? "M" : "L"}${stop.map_position.x} ${stop.map_position.y}`).join(" ");
   const modeLabel = route.mode === "deep" ? "深度走读" : "轻松逛";
   const routeIndex = new Map(route.stops.map((stop, index) => [stop.slug, index + 1]));
@@ -465,9 +490,9 @@ function renderRoute() {
   `).join("")}
 </section>
     ${selectedPlace ? `<section class="arrival-confirm reveal" aria-live="polite"><div><small>${selectedPlace.zone?.name || "碧江村"}</small><strong>${selectedPlace.name}</strong><p>${selectedPlace.subtitle || "确认后将这里设为你的模拟位置。"}</p></div><div><button class="secondary-button" data-action="cancel-arrival">取消</button><button class="primary-button" data-action="confirm-arrival">模拟到达此处</button></div></section>` : ""}
-    <section class="route-stats reveal"><div>${icon("clock")}<span><strong>${route.total_estimated_minutes}分钟</strong><small>${modeLabel}</small></span></div><div>${icon("book")}<span><strong>${route.stops.length}个故事点</strong><small>评分 ${route.score}</small></span></div><div>${icon("walk")}<span><strong>${route.legs.reduce((sum, leg) => sum + leg.distance_meters, 0)}米</strong><small>预计步行</small></span></div></section>
+    <section class="route-stats reveal"><div>${icon("clock")}<span><strong>总时长 ${totalMinutes}分钟</strong><small>${modeLabel}</small></span></div><div>${icon("book")}<span><strong>讲解 ${narrationMinutes}分钟</strong><small>${route.stops.length}个故事点 · 评分 ${route.score}</small></span></div><div>${icon("walk")}<span><strong>步行 ${walkingMinutes}分钟</strong><small>${walkingDistance}米</small></span></div></section>
     <section class="route-stop-list reveal">
-      ${route.stops.map((stop, index) => `<article class="route-stop"><span>${index + 1}</span><div><strong>${stop.name}</strong><small>${stop.zone.name} · ${stop.visit_minutes}分钟</small><p>${stop.recommendation}</p></div></article>${route.legs[index] ? `<p class="route-bridge">${route.legs[index].narrative_bridge}</p>` : ""}`).join("")}
+      ${route.stops.map((stop, index) => `<article class="route-stop"><span>${index + 1}</span><div><strong>${stop.name}</strong><small>${stop.zone.name} · ${stop.visit_minutes}分钟讲解</small><p>${stop.recommendation}</p></div></article>${route.legs[index] ? `<p class="route-bridge">${route.legs[index].narrative_bridge}</p>` : ""}`).join("")}
     </section>
     <p class="route-note reveal">点击地图上的任意景点，确认后即可更新模拟位置；偏离推荐路线时会从新位置重新规划。</p>
     ${unlockedStamp ? `
@@ -790,6 +815,20 @@ async function initializeData() {
   }
 }
 
+async function initializeLocalVoices() {
+  try {
+    state.localVoices = await getLocalVoices();
+    state.localVoicesError = "";
+  } catch (error) {
+    console.warn("当地声音加载失败:", error.message);
+    state.localVoices = [];
+    state.localVoicesError = "当地声音暂时无法加载";
+  } finally {
+    state.localVoicesLoading = false;
+    if (!destroyed && state.view === "stories") transition(render);
+  }
+}
+
 function reportBehavior(promise) {
   promise.catch(error => console.warn('behavior record failed', error.message));
 }
@@ -890,22 +929,28 @@ function buildLocalRoute({
   }));
 
   // legs 的数量应比 stops 少一个
-  const legs = stops.slice(0, -1).map((stop, index) => ({
-    distance_meters: 160 + index * 35,
-    narrative_bridge:
-      index % 2 === 0
-        ? "沿碧水前行，不远处便是下一处风景。"
-        : "穿过古巷，下一段村落故事正在前方等待。",
-  }));
+  const legs = stops.slice(0, -1).map((stop, index) => {
+    const nextStop = stops[index + 1];
+    const dx = (Number(nextStop.map_position?.x || 0) - Number(stop.map_position?.x || 0)) * 7;
+    const dy = (Number(nextStop.map_position?.y || 0) - Number(stop.map_position?.y || 0)) * 7;
+    const distance = Math.max(80, Math.round(Math.hypot(dx, dy) / 10) * 10);
+    return {
+      distance_meters: distance,
+      estimated_minutes: Math.max(1, Math.ceil(distance / 75)),
+      narrative_bridge:
+        index % 2 === 0
+          ? "沿碧水前行，不远处便是下一处风景。"
+          : "穿过古巷，下一段村落故事正在前方等待。",
+    };
+  });
+  const walkingMinutes = legs.reduce((sum, leg) => sum + leg.estimated_minutes, 0);
+  const narrationMinutes = stops.reduce((sum, stop) => sum + stop.visit_minutes, 0);
 
   return {
     id: `local-route-${Date.now()}`,
     stops,
     legs,
-    total_estimated_minutes: stops.reduce(
-      (total, stop) => total + stop.visit_minutes,
-      0
-    ),
+    total_estimated_minutes: narrationMinutes + walkingMinutes,
     score: 4.8,
     mode: state.mode,
     isLocalDemo: true,
@@ -1206,6 +1251,7 @@ window.addEventListener("hashchange", syncLocation);
 
 render();
 void initializeData();
+void initializeLocalVoices();
 
 return () => {
   destroyed = true;
