@@ -3,6 +3,11 @@ from rest_framework import serializers
 from main.models import Attraction, Theme, Touchpoint
 
 
+class DeepSeekAnalyticsSerializer(serializers.Serializer):
+    question = serializers.CharField(max_length=1000, trim_whitespace=True)
+    days = serializers.IntegerField(min_value=1, max_value=365, default=30)
+
+
 class SessionCreateSerializer(serializers.Serializer):
     preference_tags = serializers.ListField(
         child=serializers.CharField(max_length=20), required=False, default=list

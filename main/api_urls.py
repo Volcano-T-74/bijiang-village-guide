@@ -3,6 +3,7 @@ from django.urls import path
 from main.api_views import (
     AttractionDetailView,
     BootstrapView,
+    DeepSeekAnalyticsView,
     EventCreateView,
     FavoriteCreateView,
     FootprintCreateView,
@@ -14,6 +15,7 @@ from main.api_views import (
 
 
 urlpatterns = [
+    path("analytics/deepseek/", DeepSeekAnalyticsView.as_view(), name="api-deepseek-analytics"),
     path("bootstrap/", BootstrapView.as_view(), name="api-bootstrap"),
     path("local-voices/", LocalVoiceListView.as_view(), name="api-local-voices"),
     path("events/", EventCreateView.as_view(), name="api-event-create"),

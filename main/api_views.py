@@ -1,8 +1,11 @@
+from django.conf import settings
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.permissions import IsAdminUser
 from rest_framework.views import APIView
 
 from main.models import (
@@ -23,8 +26,17 @@ from main.serializers import (
     FootprintCreateSerializer,
     ItineraryGenerateSerializer,
     SessionCreateSerializer,
+    DeepSeekAnalyticsSerializer,
+)
+from main.services.deepseek_client import (
+    DeepSeekConfigurationError,
+    DeepSeekResponseError,
+    DeepSeekTimeoutError,
+    DeepSeekUpstreamError,
+    analyze_visitor_metrics,
 )
 from main.services.route_planner import NoRouteError, build_route_payload, generate_route
+from main.services.visitor_analytics import build_visitor_metrics
 
 
 def _session_from_request(request):
@@ -349,4 +361,42 @@ class FootprintCreateView(APIView):
                 "audio_played": footprint.audio_played,
             },
             status=status.HTTP_201_CREATED,
+        )
+
+
+class DeepSeekAnalyticsView(APIView):
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        serializer = DeepSeekAnalyticsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        question = serializer.validated_data["question"]
+        days = serializer.validated_data["days"]
+        try:
+            metrics = build_visitor_metrics(days=days)
+            analysis = analyze_visitor_metrics(question, metrics)
+        except DeepSeekConfigurationError:
+            return Response(
+                {"detail": "DeepSeek 服务尚未配置。"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        except DeepSeekTimeoutError:
+            return Response(
+                {"detail": "DeepSeek 服务响应超时，请稍后重试。"},
+                status=status.HTTP_504_GATEWAY_TIMEOUT,
+            )
+        except (DeepSeekUpstreamError, DeepSeekResponseError):
+            return Response(
+                {"detail": "DeepSeek 服务暂时不可用，请稍后重试。"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        return Response(
+            {
+                "question": question,
+                "period": metrics["period"],
+                "metrics": metrics,
+                "analysis": analysis,
+                "model": settings.DEEPSEEK_MODEL,
+            }
         )
