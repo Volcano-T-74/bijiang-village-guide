@@ -210,6 +210,28 @@ describe('Bijiang village website', () => {
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
   })
 
+  it('keeps keyboard focus in the stamp celebration and closes it with Escape', async () => {
+    const wrapper = mount(App, { attachTo: document.body })
+    await flushPromises()
+    await wrapper.get('[data-route="interests"]').trigger('click')
+    await wrapper.get('[data-action="generate-route"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.get('[data-map-slug="village-history-museum"]').trigger('click')
+    await wrapper.get('[data-action="confirm-arrival"]').trigger('click')
+    await flushPromises()
+
+    const closeButton = wrapper.get('[data-action="close-stamp-unlock"]')
+    expect(document.activeElement).toBe(closeButton.element)
+    expect(wrapper.get('.route-map').attributes()).toHaveProperty('inert')
+    expect(wrapper.get('.back-button').attributes()).toHaveProperty('inert')
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushPromises()
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(document.activeElement?.dataset.mapSlug).toBe('village-history-museum')
+  })
+
   it('keeps the simulated map available when location permission is denied', async () => {
     const getCurrentPosition = vi.fn((_, failure) => failure({ code: 1 }))
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } })
@@ -387,6 +409,7 @@ describe('Bijiang village website', () => {
     expect(itineraryCalls).toBe(2)
     expect(wrapper.findAll('.route-stop strong').map(item => item.text())).toEqual(['村史馆'])
     expect(wrapper.find('[data-map-slug="bixi-scholar-hall"].is-current').exists()).toBe(true)
+    expect(wrapper.get('[role="dialog"]').text()).toContain('碧溪书公祠')
     expect(wrapper.text()).toContain('暂无可用剩余路线')
   })
 

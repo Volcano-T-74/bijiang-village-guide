@@ -625,6 +625,22 @@ function render() {
   app.innerHTML = renders[state.view]();
   const attractionTitle = state.attractionDetail?.name || "景点故事";
   document.title = `${({home:"首页",stamps:"集章寻迹",stories:"碧江故事",profile:"我的",interests:"兴趣路线",route:"我的路线",attraction:attractionTitle,ancestral:"黄氏宗祠",overview:"村落概览",clan:"宗祠与家风",waterside:"古桥与水岸",poetry:"诗词与巷道"})[state.view]} · 碧江寻迹`;
+  const stampBackdrop = app.querySelector("[data-dismiss-stamp-unlock]");
+  if (stampBackdrop) {
+    const main = stampBackdrop.closest("main");
+    const shell = stampBackdrop.closest(".app-shell");
+    for (const child of main?.children || []) {
+      if (child !== stampBackdrop) child.setAttribute("inert", "");
+    }
+    for (const child of shell?.children || []) {
+      if (child !== main) child.setAttribute("inert", "");
+    }
+    queueMicrotask(() => {
+      if (state.unlockedStampSlug) {
+        stampBackdrop.querySelector("[data-action='close-stamp-unlock']")?.focus();
+      }
+    });
+  }
 }
 
 function transition(update) {
@@ -644,6 +660,20 @@ function showToast(message) {
   toast.textContent = message;
   toast.classList.add("show");
   toastTimer = setTimeout(() => toast.classList.remove("show"), 2200);
+}
+
+function closeStampUnlock() {
+  const unlockedSlug = state.unlockedStampSlug;
+  if (!unlockedSlug) return;
+  state.unlockedStampSlug = null;
+  transition(() => {
+    render();
+    queueMicrotask(() => {
+      const marker = Array.from(app.querySelectorAll("[data-map-slug]"))
+        .find(item => item.dataset.mapSlug === unlockedSlug);
+      marker?.focus();
+    });
+  });
 }
 
 async function initializeData() {
@@ -1073,8 +1103,7 @@ const handleClick = (event) => {
   if (route) { event.preventDefault(); navigate(route.dataset.route); return; }
   const stampBackdrop = event.target.closest("[data-dismiss-stamp-unlock]");
   if (stampBackdrop && event.target === stampBackdrop) {
-    state.unlockedStampSlug = null;
-    transition(render);
+    closeStampUnlock();
     return;
   }
   const button = event.target.closest("button");
@@ -1094,7 +1123,7 @@ const handleClick = (event) => {
   if (button.dataset.action === "generate-route") { void createRoute(); return; }
   if (button.dataset.action === "request-location") { requestRealLocation(); return; }
   if (button.dataset.action === "cancel-arrival") { state.pendingArrival = null; transition(render); return; }
-  if (button.dataset.action === "close-stamp-unlock") { state.unlockedStampSlug = null; transition(render); return; }
+  if (button.dataset.action === "close-stamp-unlock") { closeStampUnlock(); return; }
   if (button.dataset.action === "confirm-arrival") { void confirmSimulatedArrival(); return; }
   if (button.dataset.action === "favorite-current") {
     const slug = state.attractionDetail?.slug || state.selectedAttraction;
@@ -1145,6 +1174,22 @@ const handleInput = (event) => {
   if (event.target.matches("[data-audio-range]")) state.audioProgress = Number(event.target.value);
 };
 
+const handleKeydown = (event) => {
+  if (!state.unlockedStampSlug) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeStampUnlock();
+    return;
+  }
+  if (event.key === "Tab") {
+    const closeButton = app.querySelector("[data-action='close-stamp-unlock']");
+    if (closeButton) {
+      event.preventDefault();
+      closeButton.focus();
+    }
+  }
+};
+
 function syncLocation() {
   const next = location.hash.slice(1) || "home";
   const view = validViews.has(next) ? next : "home";
@@ -1155,6 +1200,7 @@ function syncLocation() {
 
 app.addEventListener("click", handleClick);
 app.addEventListener("input", handleInput);
+window.addEventListener("keydown", handleKeydown);
 window.addEventListener("popstate", syncLocation);
 window.addEventListener("hashchange", syncLocation);
 
@@ -1167,6 +1213,7 @@ return () => {
   clearInterval(audioTimer);
   app.removeEventListener("click", handleClick);
   app.removeEventListener("input", handleInput);
+  window.removeEventListener("keydown", handleKeydown);
   window.removeEventListener("popstate", syncLocation);
   window.removeEventListener("hashchange", syncLocation);
 };
