@@ -81,7 +81,7 @@ describe('Bijiang village website', () => {
     vi.unstubAllGlobals()
   })
 
-  it('loads real themes, generates a route, and opens its story', async () => {
+  it('renders route attraction introductions without detail links', async () => {
     const wrapper = mount(App, { attachTo: document.body })
     await flushPromises()
 
@@ -94,9 +94,9 @@ describe('Bijiang village website', () => {
     expect(wrapper.text()).toContain('村史馆')
     expect(wrapper.text()).toContain('匹配兴趣：岭南建筑')
 
-    await wrapper.get('[data-attraction-slug="village-history-museum"]').trigger('click')
-    await flushPromises()
-    expect(wrapper.text()).toContain('村史馆坐落于慕堂苏公祠内')
+    expect(wrapper.find('.route-stop').element.tagName).toBe('ARTICLE')
+    expect(wrapper.find('[data-attraction-slug]').exists()).toBe(false)
+    expect(wrapper.find('.route-stop .card-arrow').exists()).toBe(false)
   })
 
   it('reuses a stored visitor session instead of creating another one', async () => {
