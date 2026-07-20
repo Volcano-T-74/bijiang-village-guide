@@ -56,6 +56,23 @@ def mock_response(payload):
 )
 class DeepSeekClientTests(SimpleTestCase):
     @patch("main.services.deepseek_client.urlopen")
+    def test_includes_prior_completed_turns_before_current_metrics(self, mocked_urlopen):
+        mocked_urlopen.return_value = mock_response(
+            {"choices": [{"message": {"content": json.dumps(ANALYSIS, ensure_ascii=False)}}]}
+        )
+        history = [{"question": "第一名是谁？", "answer": ANALYSIS}]
+
+        analyze_visitor_metrics("第二名呢？", METRICS, history=history)
+
+        request = mocked_urlopen.call_args.args[0]
+        messages = json.loads(request.data.decode("utf-8"))["messages"]
+        self.assertEqual([item["role"] for item in messages], ["system", "user", "assistant", "user"])
+        self.assertEqual(messages[1]["content"], "第一名是谁？")
+        self.assertEqual(json.loads(messages[2]["content"]), ANALYSIS)
+        current = json.loads(messages[3]["content"])
+        self.assertEqual(current, {"question": "第二名呢？", "metrics": METRICS})
+
+    @patch("main.services.deepseek_client.urlopen")
     def test_returns_structured_analysis_without_sending_private_identifiers(self, mocked_urlopen):
         mocked_urlopen.return_value = mock_response(
             {"choices": [{"message": {"content": json.dumps(ANALYSIS, ensure_ascii=False)}}]}

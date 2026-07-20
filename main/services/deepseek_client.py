@@ -31,32 +31,46 @@ REQUIRED_ANALYSIS_FIELDS = {
 }
 
 
-def analyze_visitor_metrics(question, metrics):
+def analyze_visitor_metrics(question, metrics, history=None):
     api_key = settings.DEEPSEEK_API_KEY.strip()
     if not api_key:
         raise DeepSeekConfigurationError("DeepSeek API key is not configured.")
 
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "你是景区运营数据分析助手。只能依据提供的匿名聚合指标回答，"
+                "不得推断个人身份或虚构数据。历史回答仅用于理解追问，当前结论"
+                "必须以最新指标为准。返回 JSON 对象，必须包含 summary、"
+                "popular_attractions、business_recommendations、evidence、limitations；"
+                "其中 summary 是字符串，其余字段是数组。"
+            ),
+        }
+    ]
+    for turn in history or ():
+        messages.extend(
+            [
+                {"role": "user", "content": turn["question"]},
+                {
+                    "role": "assistant",
+                    "content": json.dumps(turn["answer"], ensure_ascii=False),
+                },
+            ]
+        )
+    messages.append(
+        {
+            "role": "user",
+            "content": json.dumps(
+                {"question": question, "metrics": metrics}, ensure_ascii=False
+            ),
+        }
+    )
     payload = {
         "model": settings.DEEPSEEK_MODEL,
         "temperature": 0.2,
         "response_format": {"type": "json_object"},
-        "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "你是景区运营数据分析助手。只能依据提供的匿名聚合指标回答，"
-                    "不得推断个人身份或虚构数据。返回 JSON 对象，必须包含 summary、"
-                    "popular_attractions、business_recommendations、evidence、limitations；"
-                    "其中 summary 是字符串，其余字段是数组。"
-                ),
-            },
-            {
-                "role": "user",
-                "content": json.dumps(
-                    {"question": question, "metrics": metrics}, ensure_ascii=False
-                ),
-            },
-        ],
+        "messages": messages,
     }
     request = Request(
         f"{settings.DEEPSEEK_BASE_URL.rstrip('/')}/chat/completions",
