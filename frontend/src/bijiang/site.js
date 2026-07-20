@@ -648,33 +648,34 @@ const renders = { home: renderHome, stamps: renderStamps, stories: renderStories
 let toastTimer;
 let audioTimer;
 let destroyed = false;
-const localAudio = new Audio();
+let localAudio = null;
 let localVoiceRequestToken = 0;
 
 function stopLocalVoice() {
   localVoiceRequestToken += 1;
-  localAudio.pause();
-  localAudio.currentTime = 0;
+  localAudio?.pause();
+  if (localAudio) localAudio.currentTime = 0;
+  localAudio = null;
   state.activeLocalVoiceId = null;
   state.localVoicePlaying = false;
   state.localVoiceCurrentTime = 0;
 }
 
-function bindLocalVoiceEvents(token, voiceId) {
-  const isCurrent = () => token === localVoiceRequestToken && state.activeLocalVoiceId === voiceId;
-  localAudio.addEventListener("timeupdate", () => {
+function bindLocalVoiceEvents(audio, token, voiceId) {
+  const isCurrent = () => audio === localAudio && token === localVoiceRequestToken && state.activeLocalVoiceId === voiceId;
+  audio.addEventListener("timeupdate", () => {
     if (!isCurrent()) return;
-    state.localVoiceCurrentTime = Number.isFinite(localAudio.currentTime) && localAudio.currentTime >= 0 ? localAudio.currentTime : 0;
+    state.localVoiceCurrentTime = Number.isFinite(audio.currentTime) && audio.currentTime >= 0 ? audio.currentTime : 0;
     const range = app.querySelector("[data-local-voice-range]");
     if (range) range.value = String(state.localVoiceCurrentTime);
   });
-  localAudio.addEventListener("ended", () => {
+  audio.addEventListener("ended", () => {
     if (!isCurrent()) return;
     state.localVoicePlaying = false;
     state.localVoiceCurrentTime = 0;
     if (!destroyed && state.view === "stories") transition(render);
   });
-  localAudio.addEventListener("error", () => {
+  audio.addEventListener("error", () => {
     if (!isCurrent()) return;
     state.localVoicePlaying = false;
     showToast("播放失败，请稍后重试");
@@ -1204,11 +1205,11 @@ const handleClick = (event) => {
     if (state.activeLocalVoiceId === voiceId) {
       if (state.localVoicePlaying) {
         localVoiceRequestToken += 1;
-        localAudio.pause();
+        localAudio?.pause();
         state.localVoicePlaying = false;
       } else {
         const token = ++localVoiceRequestToken;
-        bindLocalVoiceEvents(token, voiceId);
+        bindLocalVoiceEvents(localAudio, token, voiceId);
         state.localVoicePlaying = true;
         void localAudio.play().then(() => {
           if (token === localVoiceRequestToken && state.activeLocalVoiceId === voiceId) transition(render);
@@ -1221,12 +1222,13 @@ const handleClick = (event) => {
       }
     } else {
       localVoiceRequestToken += 1;
-      localAudio.pause();
+      localAudio?.pause();
+      localAudio = new Audio();
       state.activeLocalVoiceId = voiceId;
       state.localVoiceCurrentTime = 0;
       localAudio.src = voice.file_url;
       const token = ++localVoiceRequestToken;
-      bindLocalVoiceEvents(token, voiceId);
+      bindLocalVoiceEvents(localAudio, token, voiceId);
       state.localVoicePlaying = true;
       void localAudio.play().then(() => {
         if (token === localVoiceRequestToken && state.activeLocalVoiceId === voiceId) transition(render);
@@ -1300,6 +1302,7 @@ const handleInput = (event) => {
   if (event.target.matches("[data-audio-range]")) state.audioProgress = Number(event.target.value);
   if (event.target.matches("[data-local-voice-range]")) {
     const value = Number(event.target.value);
+    if (!localAudio) return;
     localAudio.currentTime = Number.isFinite(value) && value >= 0 ? value : 0;
     state.localVoiceCurrentTime = localAudio.currentTime;
   }

@@ -575,24 +575,29 @@ describe('Bijiang village website', () => {
       ])
       return jsonResponse({ detail: 'not found' }, 404)
     })
-    const handlers = {}
-    const audio = {
-      pause: vi.fn(), play: vi.fn(() => Promise.resolve()), currentTime: 0,
-      addEventListener: vi.fn((name, handler) => { (handlers[name] ||= []).push(handler) }),
-    }
-    vi.stubGlobal('Audio', vi.fn(function AudioMock() { return audio }))
+    const instances = []
+    vi.stubGlobal('Audio', vi.fn(function AudioMock() {
+      const handlers = {}
+      const audio = {
+        pause: vi.fn(), play: vi.fn(() => Promise.resolve()), currentTime: 0,
+        addEventListener: vi.fn((name, handler) => { (handlers[name] ||= []).push(handler) }),
+        dispatch(name) { for (const handler of handlers[name] || []) handler({ target: audio }) },
+      }
+      instances.push(audio)
+      return audio
+    }))
     history.replaceState({}, '', '/#stories')
     const wrapper = mount(App, { attachTo: document.body })
     await flushPromises()
     await wrapper.get('[data-local-voice-id="1"]').trigger('click')
-    const stale = Object.fromEntries(Object.entries(handlers).map(([name, list]) => [name, list[0]]))
     await wrapper.get('[data-local-voice-id="2"]').trigger('click')
     await flushPromises()
 
-    audio.currentTime = 19
-    stale.timeupdate()
-    stale.ended()
-    stale.error()
+    expect(instances).toHaveLength(2)
+    instances[0].currentTime = 19
+    instances[0].dispatch('timeupdate')
+    instances[0].dispatch('ended')
+    instances[0].dispatch('error')
     expect(wrapper.get('[data-local-voice-id="2"]').attributes('aria-label')).toContain('暂停')
     expect(wrapper.get('[data-local-voice-range="2"]').element.value).toBe('0')
     expect(wrapper.find('[role="status"]').text()).not.toContain('播放失败')
