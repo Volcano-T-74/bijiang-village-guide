@@ -524,13 +524,30 @@ describe('Bijiang village website', () => {
 
   it('switches local voice playback and pauses the previous recording', async () => {
     const first = { pause: vi.fn(), play: vi.fn(() => Promise.resolve()), addEventListener: vi.fn() }
-    vi.stubGlobal('Audio', vi.fn(function AudioMock() { return first }))
+    const AudioMock = vi.fn(function AudioMock() { return first })
+    vi.stubGlobal('Audio', AudioMock)
     history.replaceState({}, '', '/#stories')
     const wrapper = mount(App, { attachTo: document.body })
     await flushPromises()
+    expect(AudioMock).not.toHaveBeenCalled()
     await wrapper.get('[data-local-voice-id="1"]').trigger('click')
+    expect(first.preload).toBe('metadata')
     expect(first.play).toHaveBeenCalled()
     expect(wrapper.text()).toContain('00:00 / 01:28')
+  })
+
+  it('prioritizes the home hero and lazy loads secondary images', async () => {
+    history.replaceState({}, '', '/#home')
+    const wrapper = mount(App, { attachTo: document.body })
+    await flushPromises()
+
+    const hero = wrapper.get('.hero > img')
+    expect(hero.attributes('loading')).toBe('eager')
+    expect(hero.attributes('fetchpriority')).toBe('high')
+    expect(hero.attributes('decoding')).toBe('async')
+    const moduleImage = wrapper.get('.module-icon img')
+    expect(moduleImage.attributes('loading')).toBe('lazy')
+    expect(moduleImage.attributes('decoding')).toBe('async')
   })
 
   it('escapes local voice markup from the API', async () => {

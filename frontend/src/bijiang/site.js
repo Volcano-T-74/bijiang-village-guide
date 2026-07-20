@@ -697,6 +697,15 @@ function bindLocalVoiceEvents(audio, voiceId) {
 
 function render() {
   app.innerHTML = renders[state.view]();
+  for (const image of app.querySelectorAll("img")) {
+    image.setAttribute("loading", "lazy");
+    image.setAttribute("decoding", "async");
+  }
+  const homeHeroImage = app.querySelector(".hero > img");
+  if (homeHeroImage) {
+    homeHeroImage.setAttribute("loading", "eager");
+    homeHeroImage.setAttribute("fetchpriority", "high");
+  }
   const attractionTitle = state.attractionDetail?.name || "景点故事";
   document.title = `${({home:"首页",stamps:"集章寻迹",stories:"碧江故事",profile:"我的",interests:"兴趣路线",route:"我的路线",attraction:attractionTitle,ancestral:"黄氏宗祠",overview:"村落概览",clan:"宗祠与家风",waterside:"古桥与水岸",poetry:"诗词与巷道"})[state.view]} · 碧江寻迹`;
   const stampBackdrop = app.querySelector("[data-dismiss-stamp-unlock]");
@@ -1236,6 +1245,7 @@ const handleClick = (event) => {
       localAudio?.pause();
       localAudioCleanup?.();
       localAudio = new Audio();
+      localAudio.preload = "metadata";
       state.activeLocalVoiceId = voiceId;
       state.localVoiceCurrentTime = 0;
       localAudio.src = voice.file_url;
