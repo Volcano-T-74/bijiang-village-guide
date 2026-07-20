@@ -38,6 +38,10 @@ export function getBootstrap() {
   return request('/bootstrap/')
 }
 
+export function getLocalVoices() {
+  return request('/local-voices/')
+}
+
 export function generateItinerary(values) {
   return request(
     '/itineraries/generate/',
