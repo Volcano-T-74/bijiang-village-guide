@@ -173,6 +173,43 @@ describe('Bijiang village website', () => {
     )
   })
 
+  it('shows a dismissible stamp celebration only on the first simulated arrival', async () => {
+    const wrapper = mount(App, { attachTo: document.body })
+    await flushPromises()
+    await wrapper.get('[data-route="interests"]').trigger('click')
+    await wrapper.get('[data-action="generate-route"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.get('[data-map-slug="village-history-museum"]').trigger('click')
+    await wrapper.get('[data-action="confirm-arrival"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="dialog"]').text()).toContain('恭喜你已点亮')
+    expect(wrapper.get('[role="dialog"]').text()).toContain('村史馆')
+    await wrapper.get('[data-action="close-stamp-unlock"]').trigger('click')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+
+    await wrapper.get('[data-map-slug="village-history-museum"]').trigger('click')
+    await wrapper.get('[data-action="confirm-arrival"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+  })
+
+  it('closes the stamp celebration when its backdrop is clicked', async () => {
+    const wrapper = mount(App, { attachTo: document.body })
+    await flushPromises()
+    await wrapper.get('[data-route="interests"]').trigger('click')
+    await wrapper.get('[data-action="generate-route"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.get('[data-map-slug="village-history-museum"]').trigger('click')
+    await wrapper.get('[data-action="confirm-arrival"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-dismiss-stamp-unlock]').trigger('click')
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+  })
+
   it('keeps the simulated map available when location permission is denied', async () => {
     const getCurrentPosition = vi.fn((_, failure) => failure({ code: 1 }))
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } })

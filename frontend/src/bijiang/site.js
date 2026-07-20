@@ -95,6 +95,7 @@ const state = {
   route: savedDemoState.route || null,
   generating: false,
   pendingArrival: null,
+  unlockedStampSlug: null,
   currentSimulatedSlug: savedDemoState.currentSimulatedSlug || null,
   visitedSlugs: new Set(savedDemoState.visitedSlugs || []),
   locationStatus: "idle",
@@ -422,6 +423,11 @@ function renderRoute() {
   const modeLabel = route.mode === "deep" ? "深度走读" : "轻松逛";
   const routeIndex = new Map(route.stops.map((stop, index) => [stop.slug, index + 1]));
   const selectedPlace = places.find(place => place.slug === state.pendingArrival);
+  const unlockedStamp = places.find(place => place.slug === state.unlockedStampSlug);
+  const unlockedStampName = unlockedStamp ? escapeHtml(unlockedStamp.name) : "";
+  const unlockedStampImage = unlockedStamp
+    ? placeImgUrls[unlockedStamp.slug] || unlockedStamp.cover_image_url
+    : "";
   const locationContent = state.realLocation
     ? `<strong>定位成功</strong><span>纬度 ${state.realLocation.latitude.toFixed(6)} · 经度 ${state.realLocation.longitude.toFixed(6)} · 误差约 ${Math.round(state.realLocation.accuracy)} 米</span>`
     : `<strong>${state.locationStatus === "loading" ? "正在获取位置" : "真实位置"}</strong><span>${state.locationMessage || "仅在本机显示，不会上传后台"}</span>`;
@@ -464,6 +470,21 @@ function renderRoute() {
       ${route.stops.map((stop, index) => `<article class="route-stop"><span>${index + 1}</span><div><strong>${stop.name}</strong><small>${stop.zone.name} · ${stop.visit_minutes}分钟</small><p>${stop.recommendation}</p></div></article>${route.legs[index] ? `<p class="route-bridge">${route.legs[index].narrative_bridge}</p>` : ""}`).join("")}
     </section>
     <p class="route-note reveal">点击地图上的任意景点，确认后即可更新模拟位置；偏离推荐路线时会从新位置重新规划。</p>
+    ${unlockedStamp ? `
+      <div class="stamp-unlock-backdrop" data-dismiss-stamp-unlock>
+        <section class="stamp-unlock-dialog" role="dialog" aria-modal="true" aria-labelledby="stamp-unlock-title">
+          <button class="stamp-unlock-close" data-action="close-stamp-unlock" aria-label="关闭邮章提示">&times;</button>
+          <div class="stamp-unlock-art">
+            <img src="${escapeHtml(unlockedStampImage)}" alt="${unlockedStampName}邮章" />
+            <span>已点亮</span>
+          </div>
+          <small>集章寻迹</small>
+          <h2 id="stamp-unlock-title">恭喜你已点亮</h2>
+          <strong>「${unlockedStampName}」邮章</strong>
+          <p>这枚邮章已收入你的集章册。</p>
+        </section>
+      </div>
+    ` : ""}
   `, { back: true, nav: false, className: "subpage route-view" });
 }
 
@@ -969,9 +990,11 @@ async function confirmSimulatedArrival() {
   const slug = state.pendingArrival;
   if (!slug) return;
   const isOffRoute = !state.route?.stops.some(stop => stop.slug === slug);
+  const isFirstVisit = !state.visitedSlugs.has(slug);
   const previousRoute = state.route;
   state.currentSimulatedSlug = slug;
   state.visitedSlugs.add(slug);
+  if (isFirstVisit) state.unlockedStampSlug = slug;
   state.pendingArrival = null;
   persistDemoState();
   transition(render);
@@ -1048,6 +1071,12 @@ async function openAttraction(slug) {
 const handleClick = (event) => {
   const route = event.target.closest("[data-route]");
   if (route) { event.preventDefault(); navigate(route.dataset.route); return; }
+  const stampBackdrop = event.target.closest("[data-dismiss-stamp-unlock]");
+  if (stampBackdrop && event.target === stampBackdrop) {
+    state.unlockedStampSlug = null;
+    transition(render);
+    return;
+  }
   const button = event.target.closest("button");
   if (!button) return;
   if (button.dataset.mapSlug) {
@@ -1065,6 +1094,7 @@ const handleClick = (event) => {
   if (button.dataset.action === "generate-route") { void createRoute(); return; }
   if (button.dataset.action === "request-location") { requestRealLocation(); return; }
   if (button.dataset.action === "cancel-arrival") { state.pendingArrival = null; transition(render); return; }
+  if (button.dataset.action === "close-stamp-unlock") { state.unlockedStampSlug = null; transition(render); return; }
   if (button.dataset.action === "confirm-arrival") { void confirmSimulatedArrival(); return; }
   if (button.dataset.action === "favorite-current") {
     const slug = state.attractionDetail?.slug || state.selectedAttraction;
