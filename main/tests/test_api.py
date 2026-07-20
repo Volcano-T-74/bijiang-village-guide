@@ -3,7 +3,7 @@ import json
 from django.core.management import call_command
 from django.test import TestCase
 
-from main.models import AttractionPath, Itinerary, VisitorSession
+from main.models import AttractionPath, Itinerary, LocalVoice, VisitorSession
 
 
 class TourismApiTests(TestCase):
@@ -28,6 +28,23 @@ class TourismApiTests(TestCase):
         self.assertEqual(len(payload["attractions"]), 9)
         self.assertEqual(payload["attractions"][0]["slug"], "village-history-museum")
         self.assertEqual(payload["attractions"][0]["map_position"], {"x": 42.0, "y": 13.0})
+
+    def test_local_voices_returns_only_active_records_in_display_order(self):
+        call_command("import_local_voices", verbosity=0)
+        LocalVoice.objects.filter(
+            original_file_name="20260719_223446.m4a"
+        ).update(is_active=False)
+
+        response = self.client.get("/api/v1/local-voices/")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload), 4)
+        self.assertEqual(payload[0]["title"], "顺德碧江村介绍（普通话）")
+        self.assertNotIn(
+            "20260719_223446.m4a",
+            [item["original_file_name"] for item in payload],
+        )
 
     def test_attraction_detail_returns_latest_story(self):
         response = self.client.get(

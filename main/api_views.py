@@ -11,6 +11,7 @@ from main.models import (
     Favorite,
     Footprint,
     Itinerary,
+    LocalVoice,
     Theme,
     VisitorEvent,
     VisitorSession,
@@ -86,6 +87,27 @@ class BootstrapView(APIView):
                 ],
                 "attractions": [_summary(item) for item in attractions],
             }
+        )
+
+
+class LocalVoiceListView(APIView):
+    def get(self, request):
+        voices = LocalVoice.objects.filter(is_active=True).order_by(
+            "display_order", "id"
+        )
+        return Response(
+            [
+                {
+                    "id": item.id,
+                    "title": item.title,
+                    "original_file_name": item.original_file_name,
+                    "file_url": item.file_url,
+                    "duration_seconds": item.duration_seconds,
+                    "language": item.language,
+                    "language_label": item.language_label,
+                }
+                for item in voices
+            ]
         )
 
 

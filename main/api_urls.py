@@ -8,12 +8,14 @@ from main.api_views import (
     FootprintCreateView,
     ItineraryDetailView,
     ItineraryGenerateView,
+    LocalVoiceListView,
     SessionCreateView,
 )
 
 
 urlpatterns = [
     path("bootstrap/", BootstrapView.as_view(), name="api-bootstrap"),
+    path("local-voices/", LocalVoiceListView.as_view(), name="api-local-voices"),
     path("events/", EventCreateView.as_view(), name="api-event-create"),
     path("favorites/", FavoriteCreateView.as_view(), name="api-favorite-create"),
     path("footprints/", FootprintCreateView.as_view(), name="api-footprint-create"),
